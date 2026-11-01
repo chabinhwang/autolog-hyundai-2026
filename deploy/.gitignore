@@ -1,0 +1,6 @@
+# 로컬에서 운영 설정을 검증해도 비밀값·배포 상태·DB 백업이 Git에 들어가지 않게 합니다.
+.env
+.env.*
+.state/
+.deploy.lock
+backups/

@@ -1,0 +1,90 @@
+# Oracle 운영용입니다. server/compose.yaml은 로컬 개발용 DB로 따로 유지합니다.
+# 실행은 deploy.sh를 사용하세요. .env 검증, 이미지 버전 기록, 실패 시 복구를 담당합니다.
+name: autolog
+
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # 이 이름은 공통 Nginx의 http://autolog-api:8080과 맺은 연결 계약입니다.
+  # container_name을 고정하지 않아도 서비스 이름이 Docker DNS 별칭으로 등록됩니다.
+  autolog-api:
+    image: ${AUTOLOG_API_IMAGE:-ghcr.io/chabinhwang/autolog-api:unconfigured}
+    platform: linux/arm64
+    restart: unless-stopped
+    init: true
+    depends_on:
+      autolog-db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 공통 Nginx가 8080으로 연결하므로 운영 포트는 고정합니다.
+      PORT: "8080"
+      DB_URL: jdbc:postgresql://autolog-db:5432/${DB_NAME:-autolog}
+      DB_USERNAME: ${DB_USERNAME:-autolog}
+      DB_PASSWORD: ${DB_PASSWORD:?deploy/.env에 DB_PASSWORD를 설정하세요}
+      # 계약 문서의 인증·CORS 구현이 사용할 값입니다. 실제 소비 코드는 앱에서 구현합니다.
+      JWT_SECRET: ${JWT_SECRET:?deploy/.env에 JWT_SECRET를 설정하세요}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      # JVM heap 외에도 metaspace, thread stack, native memory가 필요하므로 상한의 70%만 사용합니다.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0 -XX:InitialRAMPercentage=20.0 -XX:+ExitOnOutOfMemoryError -Dfile.encoding=UTF-8}
+    expose:
+      - "8080"
+    networks:
+      - default
+      - shared_proxy
+    # 호스트의 8080을 열지 않습니다. 공용 Nginx가 Docker 네트워크로 접근합니다.
+    # 초기값이며, 실제 부하·heap/native 사용량을 측정한 뒤 조정하세요.
+    mem_limit: ${API_MEMORY_LIMIT:-1536m}
+    cpus: ${API_CPUS:-1.0}
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://127.0.0.1:8080/actuator/health"]
+      start_period: 90s
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging: *bounded-logging
+
+  autolog-db:
+    # major version을 고정합니다. major 변경은 단순 이미지 교체가 아닌 DB 이전 작업입니다.
+    image: postgres:18
+    platform: linux/arm64
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-autolog}
+      POSTGRES_USER: ${DB_USERNAME:-autolog}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?deploy/.env에 DB_PASSWORD를 설정하세요}
+    volumes:
+      # PostgreSQL 18 공식 이미지의 영속 데이터 마운트 위치입니다.
+      - autolog-db:/var/lib/postgresql
+    networks:
+      - default
+    # DB에는 ports나 shared_proxy 연결을 추가하지 않습니다.
+    mem_limit: ${DB_MEMORY_LIMIT:-512m}
+    cpus: ${DB_CPUS:-0.5}
+    healthcheck:
+      # $$는 Compose 치환을 피하고 컨테이너 안의 환경변수로 확장하게 합니다.
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      start_period: 10s
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    logging: *bounded-logging
+
+volumes:
+  # 실제 볼륨 이름은 autolog_autolog-db입니다. 컨테이너 갱신·중지는 데이터를 삭제하지 않습니다.
+  autolog-db:
+
+networks:
+  # API와 DB 전용. API의 외부 통신은 shared_proxy 연결을 이용합니다.
+  default:
+    internal: true
+  # shared-infrastructure에서 이미 생성·관리하는 공용 프록시 네트워크입니다.
+  # 이 Compose가 생성하거나 삭제하지 않습니다.
+  shared_proxy:
+    external: true
+    name: shared-proxy

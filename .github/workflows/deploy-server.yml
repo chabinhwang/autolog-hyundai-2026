@@ -1,0 +1,142 @@
+name: AutoLog API build and deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'deploy/**'
+      - '.github/workflows/deploy-server.yml'
+      - '.github/server-host-key.pub'
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'deploy/**'
+      - '.github/workflows/deploy-server.yml'
+      - '.github/server-host-key.pub'
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: '테스트·이미지 빌드 후 Oracle에 실제 배포 (서버 .env 준비 필요)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# 다른 리포의 concurrency와는 별개입니다. 공통 Nginx는 이 workflow가 변경하지 않습니다.
+concurrency:
+  group: autolog-api-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      # 공식 action의 SHA를 고정합니다. 주석의 major 버전은 업데이트 시 참고용입니다.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+          cache-dependency-path: |
+            server/*.gradle.kts
+            server/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Validate deployment script and test the server
+        env:
+          # Compose 문법 검사 전용 가짜 값입니다. 운영 환경에는 전달하지 않습니다.
+          DB_PASSWORD: ci-compose-validation-only
+          JWT_SECRET: ci-compose-validation-only-32-bytes-minimum
+        run: |
+          set -euo pipefail
+          bash -n deploy/deploy.sh
+          node --test deploy/tests/deploy.test.mjs
+          docker compose --env-file deploy/env.example -f deploy/compose.yaml config --quiet
+          bash server/gradlew -p server --no-daemon test
+
+      - name: Select the separate AutoLog image repository
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/autolog-api" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Log in to GHCR on trusted events
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build ARM64 image (publish on push/manual runs)
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: server
+          file: server/Dockerfile
+          platforms: linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          build-args: VCS_REF=${{ github.sha }}
+          cache-from: type=gha,scope=autolog-api
+          cache-to: type=gha,mode=max,scope=autolog-api
+
+  deploy:
+    needs: build
+    # 최초에는 build만 수행합니다. .env 준비 후 수동 deploy=true 또는 아래 리포 변수를 활성화하세요.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.deploy) ||
+       (github.event_name == 'push' && vars.AUTOLOG_DEPLOY_ENABLED == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DEPLOY_DIR: autolog-hyundai-2026
+      DEPLOY_IMAGE: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure SSH with the pinned Oracle host key
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_HOST" && test -n "$SSH_USER" && test -n "$SSH_PRIVATE_KEY"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_autolog
+          chmod 600 ~/.ssh/id_autolog
+          printf '%s %s\n' "$SSH_HOST" "$(cat .github/server-host-key.pub)" > ~/.ssh/known_hosts
+          # 비밀값을 출력하지 않고, ssh-keyscan의 최초 접속 신뢰 대신 검증된 호스트키를 사용합니다.
+          {
+            printf 'Host autolog-oracle\n  HostName %s\n  User %s\n' "$SSH_HOST" "$SSH_USER"
+            printf '  IdentityFile ~/.ssh/id_autolog\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  BatchMode yes\n'
+          } > ~/.ssh/config
+
+      - name: Upload only deployment files (preserve server .env and release state)
+        run: |
+          set -euo pipefail
+          tar -C deploy -czf - compose.yaml deploy.sh env.example README.md | \
+            ssh autolog-oracle "umask 077; mkdir -p ~/$DEPLOY_DIR; tar -xzf - -C ~/$DEPLOY_DIR"
+
+      - name: Pull the immutable image and deploy only AutoLog
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # 토큰은 SSH 표준입력→docker login으로만 전달하고, 공유 ~/.docker 설정을 쓰지 않습니다.
+          printf '%s' "$GHCR_TOKEN" | ssh autolog-oracle \
+            "AUTOLOG_GHCR_USERNAME='$GITHUB_ACTOR' AUTOLOG_API_IMAGE='$DEPLOY_IMAGE' bash ~/$DEPLOY_DIR/deploy.sh"
