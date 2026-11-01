@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutoLog</string>
+    <string name="tagline">차가 쓰고, 한마디로 끝내는 운행일지</string>
+</resources>
