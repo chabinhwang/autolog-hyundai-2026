@@ -25,18 +25,25 @@ docker compose up -d                                         # 로컬 PostgreSQL
 ./gradlew test
 ```
 
-운영 환경에서는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`(필요하면 `PORT`) 환경변수를 설정합니다.
+- `local` 프로필은 개발용 JWT 키·CORS(`http://localhost:5173`)·시드 계정을 씁니다. 시드 계정: `admin@autolog-demo.kr` / `autolog-local-1234` (회사 「오토로그 주식회사」).
+- `./gradlew test`는 Testcontainers로 PostgreSQL을 띄우므로 Docker가 실행 중이어야 합니다.
+- 운영 환경변수: 필수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`(32바이트 이상), `CORS_ALLOWED_ORIGINS` / 선택 `PORT`, `JWT_EXPIRES_HOURS`, `CONSENT_VERSION`, `SEED_*`. 설명은 [config.md](docs/contracts/config.md)에 있습니다.
 
 ### 대시보드
 
 ```sh
 cd dashboard
-npm install
-npm run dev      # http://localhost:5173, /api·/actuator는 localhost:8080으로 프록시
-npm run build
+npm ci
+npm run dev      # http://localhost:5173, /api는 localhost:8080으로 프록시
+npm run lint
+npm run test     # vitest (jsdom)
+npm run build    # dist/
 ```
 
-서버 주소를 바꾸려면 `AUTOLOG_SERVER_URL` 환경변수를 지정합니다.
+- `VITE_API_BASE_URL`: `/api/v1`까지 포함한 API 주소(빌드 시점 값). 비우면 `/api/v1`로 호출해 개발 서버 프록시를 씁니다. 운영은 `https://autolog-api.aihub.io.kr/api/v1`. 예시는 `dashboard/.env.example`.
+- `AUTOLOG_SERVER_URL`: 개발 서버 프록시 대상. 기본 `http://localhost:8080`.
+- 개발 서버는 `http://localhost:5173`으로 접속합니다. 프록시가 브라우저의 `Origin`을 그대로 넘기므로, 서버 `CORS_ALLOWED_ORIGINS`에 없는 주소(예: `127.0.0.1:5173`)로 열면 403이 납니다.
+- Cloudflare Pages: 루트 `dashboard`, 빌드 명령 `npm run build`, 출력 `dist`, 환경변수 `VITE_API_BASE_URL`. Pages 도메인은 서버 `CORS_ALLOWED_ORIGINS`에 추가합니다.
 
 ### 차량 앱
 
@@ -52,7 +59,7 @@ Android Studio에서 `app/` 폴더를 열어도 됩니다. debug 빌드는 에�
 ## 테스트 환경·필요한 설정
 
 - JDK 25(서버) / JDK 17 이상(차량 앱 Gradle 실행)
-- Node.js 24
+- Node.js 24 (대시보드 테스트의 jsdom 30은 Node 22.22.2 이상 또는 24.15.0 이상)
 - Android SDK Platform 37 (compileSdk 37, targetSdk 35, minSdk 28)
 - **Pleos Connect 전용 AVD** (`Pleos_Connect_v2.1`, Android 14). 일반 Android·Automotive 이미지에는 Pleos Vehicle Service가 없어 Vehicle SDK가 동작하지 않습니다.
 - 차량 상태는 Pleos Virtual Console로 시뮬레이션합니다.

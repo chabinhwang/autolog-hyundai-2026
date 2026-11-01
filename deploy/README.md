@@ -8,7 +8,7 @@
 - 공통 Nginx는 `shared-proxy` 네트워크의 **`autolog-api:8080`**으로 전달합니다.
 - 기존 shared-infrastructure API는 별도 Compose 프로젝트에서 **8000**을 사용합니다.
 - 이 폴더는 배포 파일과 workflow를 준비한 것이며, 파일 추가만으로 운영 API·DB를 실행하지 않습니다.
-- 현재 서버에는 공통 응답·예외 처리와 Actuator가 있습니다. 로그인·페어링·운행 API·관리자 시드·Flyway 테이블·CORS 처리는 각 기능 구현에서 완성해야 합니다. **health가 UP이어도 업무 기능이 구현되었다는 뜻은 아닙니다.**
+- 서버에는 계약 문서의 1차 API 24개(관리자 로그인, 페어링·기기, 운행 업로드·수정·조회, 월간 집계, 기록부 XLSX, 차량·직원·장소), Flyway `V1` 스키마, 관리자 JWT·기기 토큰 인증, CORS, 회사·관리자 시드가 구현돼 있습니다. 2차 범위(월 마감, SSE, PDF 등)는 없습니다.
 
 앱 동작과 데이터 모델의 기준은 [계약 문서](../docs/contracts/README.md), [인증·동작 규칙](../docs/contracts/rules.md), [DB 계약](../docs/contracts/database.md)입니다. `docs/`의 Pleos 원문 아카이브는 SDK 참고 자료입니다.
 
@@ -94,10 +94,16 @@ nano .env
 | `DB_NAME`, `DB_USERNAME` | 최초 기본값 `autolog`. 볼륨 초기화 후 변경은 DB 안의 계정·DB도 별도로 관리해야 함 |
 | `DB_PASSWORD` | 반드시 채움. `openssl rand -hex 32` 등으로 생성한 별도 값. 기존 볼륨의 DB 비밀번호는 `.env`만 바꿔도 자동 변경되지 않음 |
 | `JWT_SECRET` | 계약상 HS256 서명 키, 32바이트 이상. DB 비밀번호와 다른 값으로 생성 |
-| `CORS_ALLOWED_ORIGINS` | 실제 대시보드 origin들과 `http://localhost:5173`을 쉼표로 구분. 경로나 마지막 `/` 없음 |
+| `CORS_ALLOWED_ORIGINS` | 실제 대시보드 origin들과 `http://localhost:5173`을 쉼표로 구분. 경로나 마지막 `/` 없음. 비어 있으면 서버가 시작하지 않음 |
+| `JWT_EXPIRES_HOURS` | 선택, 기본 12. 관리자 JWT 만료 시간 |
+| `CONSENT_VERSION` | 선택, 기본 `2026-11-01`. 동의 문서를 바꾸면 올림 |
+| `SEED_ORG_NAME`, `SEED_BIZ_REG_NO`, `SEED_ADMIN_LOGIN_ID`, `SEED_ADMIN_PASSWORD` | 네 값이 모두 있을 때만 서버 시작 시 회사·관리자를 만듦. 같은 사업자등록번호가 이미 있으면 아무것도 바꾸지 않음. 형식(`000-00-00000`, 이메일)이 틀리면 시작 실패 |
+| `SEED_ADMIN_DISPLAY_NAME` | 선택, 기본 `관리자` |
 | `API_MEMORY_LIMIT`, `API_CPUS` | 시작 기본값 1536m / 1.0 CPU. 실제 사용량을 보고 조정 |
 | `DB_MEMORY_LIMIT`, `DB_CPUS` | 시작 기본값 512m / 0.5 CPU. PostgreSQL 성능·사용량을 보고 조정 |
 | `JAVA_TOOL_OPTIONS` | 선택. heap 70% 외에 metaspace·thread stack 등 native 메모리 공간을 남겨둠 |
+
+첫 배포는 `SEED_*`를 채워 회사·관리자를 만들고, 대시보드 로그인을 확인한 뒤 `SEED_ADMIN_PASSWORD`를 지워도 됩니다(이미 만든 계정은 유지). 심사용 회사·계정은 `SEED_*` 값을 바꿔 다시 시작해 만듭니다. 관리자 비밀번호 변경 API는 1차 범위 밖입니다.
 
 dotenv 값에 `$`, `#` 등 문자가 있으면 작은따옴표로 감쌉니다. 이 파일을 `source`로 실행하지 않습니다. `.env`는 서버에 보관하며 Actions가 매번 덮어쓰지 않습니다. 비밀값이 보이는 `docker compose config` 전체 출력도 CI에 남기지 않습니다.
 
