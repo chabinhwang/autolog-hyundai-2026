@@ -36,6 +36,8 @@ object VoiceAnswerParser {
         "연수" to BusinessCategory.TRAINING,
     )
     private val BUSINESS_WORDS = listOf("업무", "출장", "일")
+    /** 짧은 "업무"가 STT에서 "너무"로 인식된 사례(AVD 실측). 응답 전체가 그것일 때만 업무로 본다. */
+    private val MISHEARD_BUSINESS = Regex("너무(요|예요|였어요|였어)?")
     private val COMMUTE_WORDS = listOf("출근", "퇴근", "출퇴근")
     private val PERSONAL_WORDS = listOf("개인", "사적", "아니", "아뇨", "노")
     private val YES_WORDS = listOf("응", "어", "네", "예", "그래", "맞아", "맞습니다", "맞아요", "좋아", "기록해", "오케이", "ok")
@@ -47,7 +49,7 @@ object VoiceAnswerParser {
         CATEGORY_WORDS.firstOrNull { (word, _) -> word in t }?.let { (_, category) ->
             return Answer.Explicit(Purpose.BUSINESS, category)
         }
-        if (BUSINESS_WORDS.any { word -> if (word.length == 1) t == word || t.startsWith("${word}이") else word in t }) {
+        if (BUSINESS_WORDS.any { word -> if (word.length == 1) t == word || t.startsWith("${word}이") else word in t } || MISHEARD_BUSINESS.matches(t)) {
             return Answer.Explicit(Purpose.BUSINESS, null)
         }
         if (PERSONAL_WORDS.any { word -> if (word.length == 1) t == word else word in t }) return Answer.Personal

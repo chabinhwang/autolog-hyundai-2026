@@ -48,6 +48,16 @@ class VoiceAnswerParserTest {
     }
 
     @Test
+    fun `응답 전체가 너무면 업무 오인식으로 본다`() {
+        listOf("너무", "너무요", "너무예요", "너무였어요.").forEach {
+            assertEquals(it, Answer.Explicit(Purpose.BUSINESS, null), VoiceAnswerParser.parse(it))
+        }
+        listOf("너무 피곤해", "너무 멀었어").forEach {
+            assertEquals(it, Answer.Unknown, VoiceAnswerParser.parse(it))
+        }
+    }
+
+    @Test
     fun `알아들을 수 없으면 Unknown`() {
         listOf("", "  ", "어제 날씨", "음").forEach {
             assertEquals(it, Answer.Unknown, VoiceAnswerParser.parse(it))
