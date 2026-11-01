@@ -54,16 +54,24 @@ cd app
 ./gradlew :car:testDebugUnitTest
 ```
 
-Android Studio에서 `app/` 폴더를 열어도 됩니다. debug 빌드는 에뮬레이터에서 호스트의 로컬 서버(`http://10.0.2.2:8080`)에 연결합니다.
+Android Studio에서 `app/` 폴더를 열어도 됩니다. debug 빌드의 서버 주소는 `http://10.0.2.2:8080`입니다. Pleos AVD에서 호스트 서버에 실제 연결되는지는 미확인입니다 (2026-11-02).
 
 ## 테스트 환경·필요한 설정
 
 - JDK 25(서버) / JDK 17 이상(차량 앱 Gradle 실행)
 - Node.js 24 (대시보드 테스트의 jsdom 30은 Node 22.22.2 이상 또는 24.15.0 이상)
-- Android SDK Platform 37 (compileSdk 37, targetSdk 35, minSdk 28)
-- **Pleos Connect 전용 AVD** (`Pleos_Connect_v2.1`, Android 14). 일반 Android·Automotive 이미지에는 Pleos Vehicle Service가 없어 Vehicle SDK가 동작하지 않습니다.
-- 차량 상태는 Pleos Virtual Console로 시뮬레이션합니다.
+- Android SDK Platform 37 (compileSdk 37, targetSdk 35, minSdk 28). 설치 패키지명은 `platforms;android-37.0` (**확인됨 2026-11-02**). SDK 경로는 `app/local.properties`의 `sdk.dir` 또는 `ANDROID_HOME`으로 지정합니다. 이 PC의 SDK 경로는 `~/Library/Android/sdk` (`app/local.properties` 기준, **확인됨 2026-11-02**).
+- **Pleos Connect 전용 AVD** (Emulator 2.1.0, Android 14/API 34). 일반 Android·Automotive 이미지에는 Pleos Vehicle Service가 없어 Vehicle SDK가 동작하지 않습니다.
 - Docker (로컬 PostgreSQL)
+
+Pleos Connect Emulator 설정은 다음과 같이 **확인됨 (2026-11-02)**. 이 PC의 이미지 설치·AVD 생성·Virtual Console 연결은 **진행 중**이며 완료 여부는 아직 미확인입니다.
+
+- Apple Silicon(arm64) 이미지가 있습니다. 패키지는 `system-images;android-34;pleos_car_emulator;arm64-v8a`, 다운로드 크기는 약 4.7GB입니다.
+- SDK Update Site: `https://nexus-playground.pleos.ai/repository/raw-releases/connect-avd/2.x/crp-arm64-sys-img.xml`. Android Studio SDK Manager에 등록하거나 `~/.android/repositories.cfg`에 사이트를 등록해 명령줄 `sdkmanager`로 설치할 수 있습니다.
+- AVD는 **Cold boot**, RAM **4GB**로 설정합니다. Quick boot에서는 VHAL을 사용할 수 없습니다.
+- Virtual Console은 `adb forward tcp:8088 tcp:8088` 실행 후 [로컬 웹 페이지](http://127.0.0.1:8088/)에서 엽니다. 실제 기어 값·TTS/STT 동작은 미확인입니다.
+
+공식 안내: [Pleos Connect Emulator 설치 및 실행](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator). Vehicle SDK 2.3.2의 기어 API·권한과 TTS/STT SDK 3.3.1 생성자·모드·권한은 [아키텍처의 SDK 확인 사항](docs/contracts/architecture.md#5-sdk-확인-사항)에 정리했습니다.
 
 ## APK 위치
 

@@ -2,7 +2,7 @@
 
 > [계약 문서 목차](README.md)
 
-2026-11-01 기준. 구성 요소 내부 패키지 구조는 아직 코드에 없으므로 **(제안)**입니다. 구현하면서 바뀌면 이 문서를 먼저 고칩니다.
+설계 초안은 2026-11-01 기준이며 구성 요소 내부 패키지 구조는 **(제안)**입니다. SDK 확인 사항은 2026-11-02에 갱신했습니다. 구현하면서 바뀌면 이 문서를 먼저 고칩니다.
 
 ## 1. 전체 구조
 
@@ -13,9 +13,9 @@
 │  Pleos SDK ──┐                                              │
 │  (Odometer,  │   ┌──────────┐   ┌──────────┐   ┌─────────┐  │
 │   위치, 내비, ├──▶│ 트립 감지 │──▶│ 용도 추정 │──▶│ 음성 확인│  │
-│   STT/TTS)   │   └──────────┘   └──────────┘   └────┬────┘  │
-│  AAOS Car API┘                                     ▼        │
-│  (기어)              ┌───────────────────────────────────┐  │
+│   기어,      │   └──────────┘   └──────────┘   └────┬────┘  │
+│   STT/TTS) ──┘                                     ▼        │
+│                      ┌───────────────────────────────────┐  │
 │                      │ Room (로컬 DB, 오프라인 우선)       │  │
 │                      │ 트립 · 수정 이력 · 집 위치 · 설정   │  │
 │                      └──────────────┬────────────────────┘  │
@@ -96,7 +96,7 @@
 
 ```text
 com.autolog.app
-├── vehicle/   Pleos Vehicle SDK(Odometer) + AAOS Car API(기어) 래퍼
+├── vehicle/   Pleos Vehicle SDK 2.3.2(Odometer·Gear) 래퍼
 ├── location/  LocationSource ← FusedLocation SDK | Android 위치 API
 ├── voice/     VoiceIO       ← Pleos STT/TTS | Android TextToSpeech/SpeechRecognizer
 ├── trip/      트립 감지 상태 머신 (Foreground Service), 0.5km 병합
@@ -148,12 +148,42 @@ src/
 | 개인 운행 비공개 | 마스킹 단일 지점 (D4) | 직원 감시 우려 대응 |
 | 계약 문서 먼저 | `docs/contracts/`를 고친 다음 코드 | 세 프로젝트가 따로 움직여도 어긋나지 않게 |
 
-## 5. 확인 안 된 전제
+## 5. SDK 확인 사항
+
+다음은 실제 SDK 아티팩트·공식 문서로 **확인됨 (2026-11-02)**. API의 존재·권한 확인과 에뮬레이터에서의 실제 동작 확인을 구분합니다.
+
+### Vehicle SDK 2.3.2
+
+- 기어는 `Vehicle.getGear()`로 접근합니다. 기어 조회에 AAOS `CarPropertyManager`가 필요하다는 기존 전제는 정정합니다.
+- 현재 값: `Gear.getCurrentGearSelectionState(onComplete, onFailed)`.
+- 변경 구독·해제: `registerGearSelection` / `unregisterGearSelection`, 콜백 `GearSelectionListener.onSelected(VehicleGear?)`.
+- `VehicleGear` 값에는 `GEAR_PARK`, `GEAR_DRIVE`, `GEAR_REVERSE`, `GEAR_NEUTRAL`, `GEAR_UNKNOWN` 등이 있습니다.
+- Odometer·Gear·Brake·DrivingMode의 권한은 `pleos.car.permission.CAR_DRIVE`입니다.
+- 에뮬레이터에서 실제 기어 값·콜백이 전달되는지는 **미확인**입니다.
+
+공식 문서: [Vehicle API](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/vehicle/ai.pleos.playground.vehicle/vehicle/entry), [Vehicle 권한](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/vehicle-permission).
+
+### 음성·위치 SDK
+
+| 기능 | 확인된 API·권한 (2026-11-02) | 실행 검증 |
+| --- | --- | --- |
+| TTS SDK 3.3.1 | `TextToSpeech(context, Mode)`, `pleos.car.permission.TTS_SERVICE` | 에뮬레이터 동작 미확인 |
+| STT SDK 3.3.1 | `SpeechToText(context, Mode)`, `pleos.car.permission.STT_SERVICE` | 에뮬레이터 동작 미확인 |
+| FusedLocation | `pleos.car.permission.FUSED_LOCATION`, 보호 수준 `dangerous`이므로 매니페스트 선언과 런타임 요청 필요 | 위치 콜백·지원 여부 미확인 |
+
+- TTS/STT의 `Mode`는 `SERVER` / `ON_DEVICE` / `HYBRID`. `ON_DEVICE`는 앱 등록(`registerApp`)이 불필요합니다 (**확인됨 2026-11-02**).
+- 권한명 확인이 App Market 승인 여부나 에뮬레이터 동작 확인을 뜻하지는 않습니다.
+
+공식 문서: [TTS 생성자](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/TextToSpeech/text-to-speech/ai.pleos.playground.tts/text-to-speech/-text-to-speech), [TTS 앱 등록](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/TextToSpeech/app-registration), [TTS 권한](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/TextToSpeech/declaring-permissions), [STT 생성자](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/SpeechToText/speech-to-text/ai.pleos.playground.stt/speech-to-text/-speech-to-text), [STT 앱 등록](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/SpeechToText/app-registration), [STT 권한](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/SpeechToText/declaring-permissions), [FusedLocation 권한](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/FusedLocation/declaring-permissions).
+
+에뮬레이터 이미지·부팅·Virtual Console 설정은 루트 [README](../../README.md#테스트-환경필요한-설정)를 따릅니다.
+
+## 6. 확인 안 된 전제
 
 | 항목 | 영향 | 확인 방법 |
 | --- | --- | --- |
-| 기어 값 읽기: AAOS Car API 권한이 Pleos에서 허용되는지 | 트립 감지 방식 (`trip/`) | Pleos AVD + Virtual Console |
-| 외부 인터넷 연결, Foreground Service, STT/TTS ON_DEVICE | `sync/`, `trip/`, `voice/` 구현 방식 | Pleos AVD |
+| Vehicle SDK Gear의 실제 값·콜백 수신 (API·CAR_DRIVE 권한은 2026-11-02 확인됨, 실행은 미확인) | 트립 감지 방식 (`trip/`) | Pleos AVD + Virtual Console |
+| 외부 인터넷 연결, Foreground Service, STT/TTS ON_DEVICE 실행 (미확인) | `sync/`, `trip/`, `voice/` 구현 방식 | Pleos AVD |
 | 로컬 서버 주소가 `10.0.2.2`로 보이는지 | debug 빌드 서버 주소 | Pleos AVD |
 
 모두 차량 앱 내부 구현에만 영향이 있고, 서버·대시보드 구조와 API 계약은 바뀌지 않습니다.
