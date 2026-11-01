@@ -165,7 +165,7 @@
 ## GET /api/v1/devices/me/config — 차량 설정 내려받기
 
 - 호출: 차량 / 인증: 기기 토큰
-- 차량 정보, 회사 직원 목록, 회사·거래처 장소. 집 위치는 서버에 없음 (D2)
+- 차량 정보, 회사 직원 목록, 회사·거래처 장소, 관리자가 수정한 이 차량 트립의 현재 용도. 집 위치는 서버에 없음 (D2)
 
 ### 요청
 
@@ -176,6 +176,8 @@
 ### 성공 응답 — 200 OK
 
 직원 비활성은 `active: false`, 장소 삭제는 `deleted: true`로 전달합니다. `consentVersion`은 현재 동의 문서 버전이며, 차량 앱은 직원이 이 버전에 동의하지 않았으면 이용자로 선택될 때 동의를 받습니다.
+
+`tripUpdates`는 이 차량(기기 토큰의 차량)의 트립 중 `since` 이후 **관리자 수정 이력**이 생긴 트립의 현재 용도입니다. `since`가 없으면 최근 90일(차량 앱의 동기화 완료 트립 보관 기간) 안의 관리자 수정이 대상입니다. 차량 앱은 같은 `clientUuid`의 로컬 트립을 이 값으로 덮어써, 관리자가 확정한 미확인 운행이 차량 화면에 남지 않게 합니다(D15). 차량 수정은 대상이 아닙니다(차량이 이미 아는 값).
 
 ```json
 {
@@ -190,6 +192,9 @@
     "places": [
       { "id": 1, "name": "본사", "type": "COMPANY", "lat": 37.497942, "lng": 127.027621, "radiusM": 200, "deleted": false },
       { "id": 4, "name": "한빛상사", "type": "CLIENT", "lat": 37.566535, "lng": 126.977969, "radiusM": 150, "deleted": false }
+    ],
+    "tripUpdates": [
+      { "clientUuid": "652d3495-eca1-4ffc-b5ef-d9c52d57ea0a", "purpose": "BUSINESS", "purposeSource": "ADMIN", "businessCategory": "OTHER" }
     ]
   },
   "error": null

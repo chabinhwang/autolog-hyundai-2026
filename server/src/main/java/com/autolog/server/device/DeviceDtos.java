@@ -1,6 +1,9 @@
 package com.autolog.server.device;
 
 import com.autolog.server.masterdata.PlaceType;
+import com.autolog.server.trip.BusinessCategory;
+import com.autolog.server.trip.Purpose;
+import com.autolog.server.trip.PurposeSource;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -43,7 +46,12 @@ public final class DeviceDtos {
 	}
 
 	public record ConfigResponse(OffsetDateTime serverTime, String consentVersion, ConfigVehicle vehicle,
-			List<ConfigDriver> drivers, List<ConfigPlace> places) {
+			List<ConfigDriver> drivers, List<ConfigPlace> places, List<ConfigTripUpdate> tripUpdates) {
+	}
+
+	/** 관리자가 수정한 이 차량 트립의 현재 용도 (rules §5 tripUpdates) */
+	public record ConfigTripUpdate(UUID clientUuid, Purpose purpose, PurposeSource purposeSource,
+			BusinessCategory businessCategory) {
 	}
 
 	public record ConfigVehicle(Long id, String regNo, String modelName, Long defaultDriverId) {

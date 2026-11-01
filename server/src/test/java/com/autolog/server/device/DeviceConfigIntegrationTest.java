@@ -7,7 +7,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.autolog.server.support.IntegrationTest;
 import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.JsonNode;
@@ -70,6 +73,45 @@ class DeviceConfigIntegrationTest extends IntegrationTest {
 		// '+'를 인코딩하지 않아 공백으로 온 경우도 받는다
 		configSince(device, afterFirst.replace("+", " "))
 				.andExpect(status().isOk());
+	}
+
+	@Test
+	void tripUpdatesCarryAdminEditsOfThisVehicleOnly() throws Exception {
+		TestOrg org = newOrg();
+		PairedDevice device = pair(org, createVehicle(org, "12가3456", "아이오닉 5"));
+		PairedDevice other = pair(org, createVehicle(org, "34나5678", "쏘나타"));
+		OffsetDateTime start = OffsetDateTime.parse("2026-11-20T09:00:00+09:00");
+		Map<String, Object> unconfirmed = trip(device.vehicleId(), start, 100, 105, "UNCONFIRMED");
+		Map<String, Object> deviceEdited = trip(device.vehicleId(), start.plusHours(1), 105, 110, "UNCONFIRMED");
+		Map<String, Object> otherVehicle = trip(other.vehicleId(), start, 200, 205, "UNCONFIRMED");
+		uploadResults(device, List.of(unconfirmed, deviceEdited));
+		uploadResults(other, List.of(otherVehicle));
+		String since = data(getWith(device.token(), "/api/v1/devices/me/config")).get("serverTime").asString();
+		assertThat(data(configSince(device, since)).get("tripUpdates")).isEmpty();
+
+		clock.advance(Duration.ofMinutes(5));
+		// 관리자 확정(D15) — 대상
+		postWith(org.token(), "/api/v1/trips/" + unconfirmed.get("clientUuid") + "/edits",
+				Map.of("reason", "운전자 확인", "changes", Map.of("purpose", "BUSINESS"))).andExpect(status().isOk());
+		// 차량 수정 — 차량이 이미 아는 값이라 대상 아님
+		postWith(device.token(), "/api/v1/trips/" + deviceEdited.get("clientUuid") + "/edits",
+				Map.of("clientEditUuid", UUID.randomUUID().toString(), "editedAt", "2026-11-20T12:05:00+09:00",
+						"purposeSource", "MANUAL", "changes", Map.of("purpose", "PERSONAL"))).andExpect(status().isOk());
+		// 다른 차량 트립의 관리자 수정 — 대상 아님
+		postWith(org.token(), "/api/v1/trips/" + otherVehicle.get("clientUuid") + "/edits",
+				Map.of("reason", "운전자 확인", "changes", Map.of("purpose", "COMMUTE"))).andExpect(status().isOk());
+
+		JsonNode changed = data(configSince(device, since));
+		assertThat(changed.get("tripUpdates")).singleElement().satisfies(update -> {
+			assertThat(update.get("clientUuid").asString()).isEqualTo(unconfirmed.get("clientUuid"));
+			assertThat(update.get("purpose").asString()).isEqualTo("BUSINESS");
+			assertThat(update.get("purposeSource").asString()).isEqualTo("ADMIN");
+			assertThat(update.get("businessCategory").asString()).isEqualTo("OTHER");
+		});
+		// since 없음 → 최근 90일 관리자 수정
+		assertThat(data(getWith(device.token(), "/api/v1/devices/me/config")).get("tripUpdates")).hasSize(1);
+		clock.advance(Duration.ofDays(91));
+		assertThat(data(getWith(device.token(), "/api/v1/devices/me/config")).get("tripUpdates")).isEmpty();
 	}
 
 	@Test

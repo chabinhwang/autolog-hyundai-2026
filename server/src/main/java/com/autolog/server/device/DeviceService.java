@@ -3,6 +3,7 @@ package com.autolog.server.device;
 import com.autolog.server.device.DeviceDtos.ConfigDriver;
 import com.autolog.server.device.DeviceDtos.ConfigPlace;
 import com.autolog.server.device.DeviceDtos.ConfigResponse;
+import com.autolog.server.device.DeviceDtos.ConfigTripUpdate;
 import com.autolog.server.device.DeviceDtos.ConfigVehicle;
 import com.autolog.server.device.DeviceDtos.ConsentRequest;
 import com.autolog.server.device.DeviceDtos.ConsentResponse;
@@ -17,6 +18,7 @@ import com.autolog.server.masterdata.Place;
 import com.autolog.server.masterdata.PlaceRepository;
 import com.autolog.server.masterdata.Vehicle;
 import com.autolog.server.masterdata.VehicleRepository;
+import com.autolog.server.trip.TripRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DeviceService {
 
+	/** since 없이 요청할 때 tripUpdates로 보낼 관리자 수정 기간 = 차량 앱의 동기화 완료 트립 보관 기간 */
+	static final Duration TRIP_UPDATES_WINDOW = Duration.ofDays(90);
+
 	/** 차량 시각 허용 오차 (D11) */
 	public static final Duration FUTURE_TOLERANCE = Duration.ofMinutes(10);
 
@@ -38,16 +43,18 @@ public class DeviceService {
 	private final DriverRepository driverRepository;
 	private final PlaceRepository placeRepository;
 	private final DriverConsentRepository consentRepository;
+	private final TripRepository tripRepository;
 	private final AppProperties properties;
 	private final Clock clock;
 
 	public DeviceService(VehicleRepository vehicleRepository, DriverRepository driverRepository,
-			PlaceRepository placeRepository, DriverConsentRepository consentRepository, AppProperties properties,
-			Clock clock) {
+			PlaceRepository placeRepository, DriverConsentRepository consentRepository, TripRepository tripRepository,
+			AppProperties properties, Clock clock) {
 		this.vehicleRepository = vehicleRepository;
 		this.driverRepository = driverRepository;
 		this.placeRepository = placeRepository;
 		this.consentRepository = consentRepository;
+		this.tripRepository = tripRepository;
 		this.properties = properties;
 		this.clock = clock;
 	}
@@ -55,6 +62,7 @@ public class DeviceService {
 	/**
 	 * since가 없으면 전체(비활성 직원·삭제 장소 포함), 있으면 그 시각 이후 updated_at이 바뀐 직원·장소만.
 	 * serverTime은 초 단위로 내림한 값이고, 비교는 이상(>=)으로 해서 같은 초의 변경도 다음 요청에 다시 실린다.
+	 * tripUpdates는 이 차량 트립 중 since(없으면 최근 90일) 이후 관리자 수정이 생긴 트립의 현재 용도.
 	 */
 	@Transactional(readOnly = true)
 	public ConfigResponse config(DevicePrincipal device, String sinceParam) {
@@ -68,12 +76,19 @@ public class DeviceService {
 		List<Place> places = since == null
 				? placeRepository.findByOrgIdOrderByIdAsc(device.orgId())
 				: placeRepository.findByOrgIdAndUpdatedAtGreaterThanEqualOrderByIdAsc(device.orgId(), since);
+		Instant editsSince = since != null ? since : serverTime.minus(TRIP_UPDATES_WINDOW);
+		List<ConfigTripUpdate> tripUpdates = tripRepository
+				.findAdminEditedSince(device.orgId(), device.vehicleId(), editsSince).stream()
+				.map(t -> new ConfigTripUpdate(t.getClientUuid(), t.getPurpose(), t.getPurposeSource(),
+						t.getBusinessCategory()))
+				.toList();
 		return new ConfigResponse(Times.toSeoul(serverTime), properties.consentVersion(),
 				new ConfigVehicle(vehicle.getId(), vehicle.getRegNo(), vehicle.getModelName(),
 						vehicle.getDefaultDriver() == null ? null : vehicle.getDefaultDriver().getId()),
 				drivers.stream().map(d -> new ConfigDriver(d.getId(), d.getDept(), d.getName(), d.isActive())).toList(),
 				places.stream().map(p -> new ConfigPlace(p.getId(), p.getName(), p.getType(), p.getLat().doubleValue(),
-						p.getLng().doubleValue(), p.getRadiusM(), p.isDeleted())).toList());
+						p.getLng().doubleValue(), p.getRadiusM(), p.isDeleted())).toList(),
+				tripUpdates);
 	}
 
 	/** 처음 기록이면 created=true(201), 같은 직원·버전이 이미 있으면 기존 기록(200) */

@@ -1,6 +1,7 @@
 package com.autolog.server.trip;
 
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -33,4 +34,14 @@ public interface TripRepository extends JpaRepository<Trip, Long>, JpaSpecificat
 	@EntityGraph(attributePaths = {"vehicle", "driver"})
 	List<Trip> findByOrgIdAndVehicleIdAndTripDateBetweenOrderByStartedAtAsc(Long orgId, Long vehicleId,
 			LocalDate from, LocalDate to);
+
+	/** 이 차량 트립 중 since 이후 관리자 수정 이력이 생긴 트립 (설정 내려받기 tripUpdates, rules §5) */
+	@Query("""
+			select t from Trip t
+			where t.orgId = :orgId and t.vehicle.id = :vehicleId and exists (
+				select 1 from TripEditLog e
+				where e.tripId = t.id and e.actorType = com.autolog.server.trip.ActorType.ADMIN and e.createdAt >= :since)
+			order by t.startedAt asc""")
+	List<Trip> findAdminEditedSince(@Param("orgId") Long orgId, @Param("vehicleId") Long vehicleId,
+			@Param("since") Instant since);
 }

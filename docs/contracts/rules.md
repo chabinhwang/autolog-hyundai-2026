@@ -100,6 +100,7 @@
 - `serverTime`은 초 단위 내림, 비교는 `updated_at >= since` (같은 초의 변경은 다음 응답에 다시 올 수 있으므로 차량 앱은 id 기준으로 덮어씀)
 - `since`가 없을 때도 비활성 직원·삭제된 장소를 포함 (차량 앱 로컬 목록 정리용)
 - 차량 정보와 현재 동의 문서 버전(`consentVersion`)은 항상 포함
+- `tripUpdates`: 이 차량 트립 중 `since` 이후(없으면 최근 90일) 관리자 수정 이력(`actor_type = ADMIN`, `created_at >= since`)이 생긴 트립의 현재 `purpose`·`purposeSource`·`businessCategory`. 차량 앱은 로컬 값을 덮어쓰고 수정 이력을 만들지 않음 (관리자 확정 후 차량 화면에 미확인으로 남아 운전자가 덮어쓰는 것을 막음, 2026-11-02 연동 점검에서 발견)
 
 ## 6. 차량 앱 동기화 (참고)
 
