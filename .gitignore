@@ -21,3 +21,6 @@
 # docs/는 계약 문서만 포함 (docs/product 기획은 로컬 전용, Pleos 문서 보관본은 .local/pleos-docs)
 /docs/*
 !/docs/contracts/
+
+# 브라우저 자동화(Playwright MCP) 스크린샷·로그
+/.playwright-mcp/
