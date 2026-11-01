@@ -1,0 +1,7 @@
+# 로컬 개발용: compose.yaml의 PostgreSQL에 연결합니다.
+# 실행: ./gradlew bootRun --args='--spring.profiles.active=local'
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/autolog
+    username: autolog
+    password: autolog

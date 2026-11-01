@@ -1,0 +1,15 @@
+# 로컬 개발용 PostgreSQL. 실행: docker compose up -d
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: autolog
+      POSTGRES_USER: autolog
+      POSTGRES_PASSWORD: autolog
+    ports:
+      - "5432:5432"
+    volumes:
+      - autolog-db:/var/lib/postgresql
+
+volumes:
+  autolog-db:

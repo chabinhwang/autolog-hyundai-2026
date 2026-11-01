@@ -1,0 +1,14 @@
+# server/만 빌드 컨텍스트로 보내고, 로컬 결과물·IDE·비밀값은 제외합니다.
+.gradle/
+build/
+.idea/
+*.iml
+.DS_Store
+.env
+.env.*
+*.key
+*.pem
+*.keystore
+*.jks
+.git/
+# gradle/wrapper/gradle-wrapper.jar는 Gradle 실행에 필요하므로 제외하지 않습니다.

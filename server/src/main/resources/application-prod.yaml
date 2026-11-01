@@ -1,0 +1,23 @@
+# 운영 Compose가 SPRING_PROFILES_ACTIVE=prod를 전달할 때만 적용합니다.
+# DB 접속값·Hibernate validate 설정은 application.yaml을 그대로 사용합니다.
+server:
+  address: 0.0.0.0
+  # HTTPS는 공통 Nginx에서 종료합니다. 전달된 scheme/host로 URL을 올바르게 구성합니다.
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  lifecycle:
+    # Compose의 stop_grace_period(30s)보다 짧게 설정합니다.
+    timeout-per-shutdown-phase: 20s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # 외부·컨테이너 healthcheck 모두 상태만 확인합니다. DB/환경 상세는 노출하지 않습니다.
+      show-details: never
+      show-components: never
