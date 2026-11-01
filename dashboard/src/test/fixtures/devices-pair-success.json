@@ -1,0 +1,10 @@
+{
+  "success": true,
+  "data": {
+    "deviceId": 7,
+    "vehicleId": 3,
+    "pairedAt": "2026-11-03T08:14:05+09:00",
+    "replacedDeviceId": 5
+  },
+  "error": null
+}

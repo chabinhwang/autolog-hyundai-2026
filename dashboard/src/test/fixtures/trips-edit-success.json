@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "data": {
+    "edit": {
+      "seq": 2,
+      "actorType": "DEVICE",
+      "changes": [
+        { "field": "purpose", "before": "UNCONFIRMED", "after": "BUSINESS" },
+        { "field": "businessCategory", "before": null, "after": "VISIT" }
+      ]
+    },
+    "current": { "purpose": "BUSINESS", "purposeSource": "MANUAL", "businessCategory": "VISIT", "note": null, "driverId": 11 }
+  },
+  "error": null
+}

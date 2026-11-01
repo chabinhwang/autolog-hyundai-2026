@@ -1,0 +1,52 @@
+{
+  "success": true,
+  "data": {
+    "clientUuid": "3f6c1e2a-0b7d-4c1e-9a52-6d1f0e8b2c11",
+    "tripDate": "2026-11-03",
+    "vehicle": { "id": 3, "regNo": "12가3456" },
+    "driver": { "id": 11, "dept": "영업1팀", "name": "김영업" },
+    "startedAt": "2026-11-03T08:12:00+09:00",
+    "endedAt": "2026-11-03T08:47:00+09:00",
+    "odoStartKm": 12034.5,
+    "odoEndKm": 12051.2,
+    "distanceKm": 16.7,
+    "origin": { "type": "HOME", "label": "집" },
+    "dest": { "type": "CLIENT", "label": "한빛상사" },
+    "purpose": "BUSINESS",
+    "purposeSource": "ADMIN",
+    "businessCategory": "MEETING",
+    "note": "분기 실적 회의",
+    "masked": false,
+    "auto": { "purpose": "UNCONFIRMED" },
+    "edits": [
+      {
+        "seq": 1,
+        "actorType": "DEVICE",
+        "actorName": "12가3456 차량",
+        "changes": [
+          { "field": "purpose", "before": "UNCONFIRMED", "after": "BUSINESS" },
+          { "field": "businessCategory", "before": null, "after": "VISIT" }
+        ],
+        "reason": null,
+        "editedAt": "2026-11-03T18:05:00+09:00",
+        "receivedAt": "2026-11-03T18:05:09+09:00"
+      },
+      {
+        "seq": 2,
+        "actorType": "ADMIN",
+        "actorName": "총무팀",
+        "changes": [
+          { "field": "businessCategory", "before": "VISIT", "after": "MEETING" },
+          { "field": "note", "before": null, "after": "분기 실적 회의" }
+        ],
+        "reason": "운전자 확인 후 업무 세부 정정",
+        "editedAt": "2026-11-04T10:00:00+09:00",
+        "receivedAt": "2026-11-04T10:00:00+09:00"
+      }
+    ],
+    "recordedAt": "2026-11-03T08:50:12+09:00",
+    "syncedAt": "2026-11-03T08:50:20+09:00",
+    "appVersion": "0.1.0"
+  },
+  "error": null
+}

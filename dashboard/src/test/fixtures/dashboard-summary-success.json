@@ -1,0 +1,36 @@
+{
+  "success": true,
+  "data": {
+    "month": "2026-11",
+    "vehicles": [
+      {
+        "vehicleId": 3,
+        "regNo": "12가3456",
+        "modelName": "아이오닉 5",
+        "defaultDriver": { "id": 11, "dept": "영업1팀", "name": "김영업" },
+        "paired": true,
+        "lastSyncedAt": "2026-11-03T18:05:09+09:00",
+        "tripCount": 14,
+        "totalKm": 412.3,
+        "commuteKm": 180.0,
+        "businessKm": 160.5,
+        "personalKm": 51.8,
+        "unconfirmedKm": 20.0,
+        "unconfirmedCount": 1,
+        "businessRatio": 82.6,
+        "maxBusinessRatio": 87.4,
+        "warnings": ["UNCONFIRMED_EXISTS"]
+      }
+    ],
+    "totals": {
+      "totalKm": 412.3,
+      "commuteKm": 180.0,
+      "businessKm": 160.5,
+      "personalKm": 51.8,
+      "unconfirmedKm": 20.0,
+      "unconfirmedCount": 1,
+      "businessRatio": 82.6
+    }
+  },
+  "error": null
+}

@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "data": {
+    "admin": { "id": 1, "loginId": "admin@autolog-demo.kr", "displayName": "총무팀" },
+    "organization": { "id": 1, "name": "오토로그 주식회사", "bizRegNo": "123-45-67890" },
+    "expiresAt": "2026-11-03T20:00:00+09:00"
+  },
+  "error": null
+}

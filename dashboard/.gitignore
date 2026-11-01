@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 환경변수 파일 (예시 파일만 저장소에 둠)
+.env
+.env.*
+!.env.example

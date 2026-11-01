@@ -1,0 +1,11 @@
+{
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+    "tokenType": "Bearer",
+    "expiresIn": 43200,
+    "admin": { "id": 1, "loginId": "admin@autolog-demo.kr", "displayName": "총무팀" },
+    "organization": { "id": 1, "name": "오토로그 주식회사" }
+  },
+  "error": null
+}

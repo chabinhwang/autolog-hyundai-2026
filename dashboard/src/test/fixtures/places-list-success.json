@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "data": [
+    { "id": 1, "name": "본사", "type": "COMPANY", "lat": 37.497942, "lng": 127.027621, "radiusM": 200, "updatedAt": "2026-11-01T10:00:00+09:00" },
+    { "id": 4, "name": "한빛상사", "type": "CLIENT", "lat": 37.566535, "lng": 126.977969, "radiusM": 150, "updatedAt": "2026-11-02T14:30:00+09:00" }
+  ],
+  "error": null
+}

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "data": {
+    "content": [
+      {
+        "clientUuid": "3f6c1e2a-0b7d-4c1e-9a52-6d1f0e8b2c11",
+        "tripDate": "2026-11-03",
+        "vehicle": { "id": 3, "regNo": "12가3456" },
+        "driver": { "id": 11, "dept": "영업1팀", "name": "김영업" },
+        "startedAt": "2026-11-03T08:12:00+09:00",
+        "endedAt": "2026-11-03T08:47:00+09:00",
+        "odoStartKm": 12034.5,
+        "odoEndKm": 12051.2,
+        "distanceKm": 16.7,
+        "origin": { "type": "HOME", "label": "집" },
+        "dest": { "type": "COMPANY", "label": "본사" },
+        "purpose": "COMMUTE",
+        "purposeSource": "VOICE",
+        "businessCategory": null,
+        "note": null,
+        "edited": false,
+        "masked": false
+      },
+      {
+        "clientUuid": "7e1d0c9b-2222-4c1e-9a52-6d1f0e8b2c13",
+        "tripDate": "2026-11-02",
+        "vehicle": { "id": 3, "regNo": "12가3456" },
+        "driver": { "id": 11, "dept": "영업1팀", "name": "김영업" },
+        "startedAt": null,
+        "endedAt": null,
+        "odoStartKm": 11990.0,
+        "odoEndKm": 12034.5,
+        "distanceKm": 44.5,
+        "origin": null,
+        "dest": null,
+        "purpose": "PERSONAL",
+        "purposeSource": "VOICE",
+        "businessCategory": null,
+        "note": null,
+        "edited": false,
+        "masked": true
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 2,
+    "totalPages": 1
+  },
+  "error": null
+}

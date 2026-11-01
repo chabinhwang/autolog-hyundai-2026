@@ -1,35 +1,86 @@
-import { useEffect, useState } from 'react'
-import { fetchServerStatus, type ServerStatus } from './api/health'
-import './App.css'
+import type { ReactNode } from 'react'
+import { AuthProvider } from './auth/AuthProvider'
+import { useAuth } from './auth/context'
+import { Alert } from './components/Alert'
+import { Layout } from './components/Layout'
+import { DriversPage } from './pages/DriversPage'
+import { ExportPage } from './pages/ExportPage'
+import { HomePage } from './pages/HomePage'
+import { LoginPage } from './pages/LoginPage'
+import { NotFoundPage } from './pages/NotFoundPage'
+import { PlacesPage } from './pages/PlacesPage'
+import { TripDetailPage } from './pages/TripDetailPage'
+import { TripListPage } from './pages/TripListPage'
+import { VehiclesPage } from './pages/VehiclesPage'
+import { Redirect } from './router/Redirect'
+import { isSafeInternalPath, matchPath, useLocation } from './router/router'
 
-const STATUS_LABEL: Record<ServerStatus, string> = {
-  checking: '서버 확인 중',
-  up: '서버 연결됨',
-  down: '서버 연결 안 됨',
+interface Route {
+  path: string
+  render: (params: Record<string, string>) => ReactNode
 }
 
-function App() {
-  const [status, setStatus] = useState<ServerStatus>('checking')
+const ROUTES: Route[] = [
+  { path: '/', render: () => <HomePage /> },
+  { path: '/trips', render: () => <TripListPage /> },
+  { path: '/trips/:clientUuid', render: (p) => <TripDetailPage key={p.clientUuid} clientUuid={p.clientUuid} /> },
+  { path: '/vehicles', render: () => <VehiclesPage /> },
+  { path: '/drivers', render: () => <DriversPage /> },
+  { path: '/places', render: () => <PlacesPage /> },
+  { path: '/export', render: () => <ExportPage /> },
+]
 
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchServerStatus(controller.signal)
-      .then(setStatus)
-      .catch(() => {
-        // 언마운트로 요청이 취소된 경우: 상태를 바꾸지 않습니다.
-      })
-    return () => controller.abort()
-  }, [])
+function renderRoute(pathname: string): ReactNode {
+  for (const route of ROUTES) {
+    const params = matchPath(route.path, pathname)
+    if (params) return route.render(params)
+  }
+  return <NotFoundPage />
+}
 
+function AppRoutes() {
+  const { state, retry } = useAuth()
+  const { pathname, search, searchParams } = useLocation()
+
+  if (state.status === 'checking') {
+    return (
+      <p className="splash" role="status">
+        로그인 상태 확인 중…
+      </p>
+    )
+  }
+
+  if (state.status === 'error') {
+    return (
+      <main className="login">
+        <div className="login__card">
+          <Alert kind="error">{state.message}</Alert>
+          <button type="button" className="button button--primary" onClick={retry}>
+            다시 시도
+          </button>
+        </div>
+      </main>
+    )
+  }
+
+  if (state.status === 'anonymous') {
+    if (pathname === '/login') return <LoginPage />
+    const next = pathname === '/' && !search ? '' : `?next=${encodeURIComponent(pathname + search)}`
+    return <Redirect to={`/login${next}`} />
+  }
+
+  if (pathname === '/login') {
+    // 로그인 직후: next가 있으면 그 화면으로
+    const next = searchParams.get('next')
+    return <Redirect to={isSafeInternalPath(next) ? next : '/'} />
+  }
+  return <Layout>{renderRoute(pathname)}</Layout>
+}
+
+export default function App() {
   return (
-    <main className="app">
-      <header className="app__header">
-        <h1>AutoLog 관리자</h1>
-        <span className={`status status--${status}`}>{STATUS_LABEL[status]}</span>
-      </header>
-      <p className="app__lead">차량이 기록한 운행일지를 모아 업무사용비율 확인, 월 마감, 기록부 내보내기를 합니다.</p>
-    </main>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   )
 }
-
-export default App

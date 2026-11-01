@@ -1,0 +1,1 @@
+{ "success": false, "data": null, "error": { "code": "PAIRING_CODE_EXPIRED", "message": "페어링 코드가 만료되었습니다. 차량에서 새 코드를 받아 주세요." } }

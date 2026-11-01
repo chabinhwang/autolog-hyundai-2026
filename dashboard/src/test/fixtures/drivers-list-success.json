@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "data": [
+    { "id": 11, "dept": "영업1팀", "name": "김영업", "active": true },
+    { "id": 12, "dept": "영업2팀", "name": "이외근", "active": true }
+  ],
+  "error": null
+}

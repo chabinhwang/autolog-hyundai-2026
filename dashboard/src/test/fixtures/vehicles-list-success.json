@@ -1,0 +1,22 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": 3,
+      "regNo": "12가3456",
+      "modelName": "아이오닉 5",
+      "defaultDriver": { "id": 11, "dept": "영업1팀", "name": "김영업" },
+      "active": true,
+      "device": { "paired": true, "deviceId": 7, "pairedAt": "2026-11-03T08:14:05+09:00", "lastSyncedAt": "2026-11-03T18:05:09+09:00" }
+    },
+    {
+      "id": 4,
+      "regNo": "34나5678",
+      "modelName": "쏘나타",
+      "defaultDriver": null,
+      "active": true,
+      "device": { "paired": false, "deviceId": null, "pairedAt": null, "lastSyncedAt": null }
+    }
+  ],
+  "error": null
+}

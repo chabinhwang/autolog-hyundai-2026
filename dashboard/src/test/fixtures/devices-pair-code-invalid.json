@@ -1,0 +1,1 @@
+{ "success": false, "data": null, "error": { "code": "PAIRING_CODE_INVALID", "message": "페어링 코드가 올바르지 않습니다." } }

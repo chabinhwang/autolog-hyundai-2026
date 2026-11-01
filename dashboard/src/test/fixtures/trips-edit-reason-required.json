@@ -1,0 +1,1 @@
+{ "success": false, "data": null, "error": { "code": "EDIT_REASON_REQUIRED", "message": "관리자 수정에는 사유가 필요합니다." } }
