@@ -14,6 +14,7 @@ import com.autolog.app.sync.FakeEditDao
 import com.autolog.app.sync.FakePlaceDao
 import com.autolog.app.sync.FakeTripDao
 import com.autolog.app.vehicle.VehicleSource
+import com.autolog.app.voice.ListenResult
 import com.autolog.app.voice.VoiceIO
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,13 +62,20 @@ class TripRecorderTest {
         override fun release() = Unit
     }
 
-    private class FakeVoice(var answer: String?) : VoiceIO {
+    private class FakeVoice(vararg results: ListenResult) : VoiceIO {
+        constructor(answer: String?) : this(answer?.let { ListenResult.Heard(it) } ?: ListenResult.NoAnswer)
+
+        private val queue = ArrayDeque(results.toList())
         val spoken = mutableListOf<String>()
+        var listens = 0
         override suspend fun speak(text: String): Boolean {
             spoken += text
             return true
         }
-        override suspend fun listen(timeoutMs: Long) = answer
+        override suspend fun listen(timeoutMs: Long): ListenResult {
+            listens++
+            return queue.removeFirstOrNull() ?: ListenResult.NoAnswer
+        }
         override fun release() = Unit
     }
 
@@ -161,6 +169,38 @@ class TripRecorderTest {
         assertEquals(EndpointType.UNREGISTERED, saved.destType)
         withTimeout(2_000) { while (voice.spoken.size < 2) delay(20) }
         assertEquals("미확인으로 남겨 둘게요. 정차 중에 화면에서 골라 주세요.", voice.spoken[1])
+        assertEquals(1, voice.listens)
+    }
+
+    @Test
+    fun `STT 오류가 나면 한 번 다시 묻고 그 응답으로 확정한다`() = runBlocking {
+        val voice = FakeVoice(ListenResult.EngineError, ListenResult.Heard("응"))
+        recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11))).start(scope)
+        delay(200)
+
+        drive(100.0, 112.4, COMPANY)
+
+        val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(Purpose.COMMUTE, saved.purpose)
+        assertEquals(PurposeSource.VOICE, saved.purposeSource)
+        withTimeout(2_000) { while (voice.spoken.size < 3) delay(20) }
+        assertEquals("잘 듣지 못했어요. 한 번 더 말씀해 주세요.", voice.spoken[1])
+        assertEquals(2, voice.listens)
+    }
+
+    @Test
+    fun `다시 물어도 STT 오류면 미확인으로 남기고 더 묻지 않는다`() = runBlocking {
+        val voice = FakeVoice(ListenResult.EngineError, ListenResult.EngineError, ListenResult.Heard("응"))
+        recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11))).start(scope)
+        delay(200)
+
+        drive(100.0, 112.4, COMPANY)
+
+        val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(Purpose.UNCONFIRMED, saved.purpose)
+        withTimeout(2_000) { while (voice.spoken.size < 3) delay(20) }
+        assertEquals("미확인으로 남겨 둘게요. 정차 중에 화면에서 골라 주세요.", voice.spoken[2])
+        assertEquals(2, voice.listens)
     }
 
     @Test

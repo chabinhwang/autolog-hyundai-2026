@@ -15,6 +15,7 @@ import com.autolog.app.purpose.PurposeDecision
 import com.autolog.app.purpose.PurposeEstimator
 import com.autolog.app.purpose.VoiceAnswerParser
 import com.autolog.app.vehicle.VehicleSource
+import com.autolog.app.voice.ListenResult
 import com.autolog.app.voice.VoiceIO
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -111,8 +112,7 @@ class TripRecorder(
             is TripRepository.RecordResult.Merged -> requestSync()
             is TripRepository.RecordResult.Saved -> {
                 voice.speak(PurposeEstimator.arrivalPrompt(dest, trip.distanceKm, estimate))
-                val answer = voice.listen(answerTimeoutMs)
-                val decision = VoiceAnswerParser.resolve(estimate, answer)
+                val decision = VoiceAnswerParser.resolve(estimate, listenWithRetry())
                 repository.applyVoiceDecision(result.trip.clientUuid, decision)
                 val message = confirmation(decision)
                 _status.value = _status.value.copy(lastMessage = message)
@@ -120,6 +120,16 @@ class TripRecorder(
                 requestSync()
             }
         }
+    }
+
+    /** STT 오류면 한 번만 다시 묻는다. 무응답은 다시 묻지 않는다 (car-app.md §3). */
+    private suspend fun listenWithRetry(): String? {
+        var heard = voice.listen(answerTimeoutMs)
+        if (heard == ListenResult.EngineError) {
+            voice.speak(RETRY_PROMPT)
+            heard = voice.listen(answerTimeoutMs)
+        }
+        return (heard as? ListenResult.Heard)?.text
     }
 
     private suspend fun persistState() {
@@ -150,6 +160,7 @@ class TripRecorder(
 
     companion object {
         private const val TAG = "AutoLogRecorder"
+        const val RETRY_PROMPT = "잘 듣지 못했어요. 한 번 더 말씀해 주세요."
 
         fun confirmation(decision: PurposeDecision): String = when (decision.purpose) {
             Purpose.COMMUTE -> "출퇴근으로 기록했어요."

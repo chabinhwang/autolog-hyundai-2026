@@ -4,10 +4,33 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SegmentCollectorTest {
+    @Test
+    fun `조각 없이 엔진 오류가 나면 기다리지 않고 실패로 끝낸다`() = runTest {
+        val c = SegmentCollector()
+        val result = async { c.await(timeoutMs = 10_000, graceMs = 1_500) }
+        delay(300)
+        c.onFailure()
+        assertNull(result.await())
+        assertTrue(c.failedWithoutAnswer)
+        assertEquals(300L, testScheduler.currentTime)
+    }
+
+    @Test
+    fun `조각을 받은 뒤의 오류는 받은 응답을 쓴다`() = runTest {
+        val c = SegmentCollector()
+        val result = async { c.await(timeoutMs = 10_000, graceMs = 1_500) }
+        c.onFinalSegment("네 맞아요")
+        c.onFailure()
+        assertEquals("네 맞아요", result.await())
+        assertFalse(c.failedWithoutAnswer)
+    }
+
     @Test
     fun `쉼으로 나뉜 조각을 이어 붙인다`() = runTest {
         val c = SegmentCollector()

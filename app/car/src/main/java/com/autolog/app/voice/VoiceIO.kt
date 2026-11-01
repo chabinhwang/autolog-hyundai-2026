@@ -18,13 +18,24 @@ import ai.pleos.playground.tts.constant.ErrorType as TtsError
 import ai.pleos.playground.tts.constant.Mode as TtsMode
 import ai.pleos.playground.tts.listener.OnInitializeListener as TtsInit
 
+/** 응답 듣기 결과. 무응답과 STT 오류를 구분한다(오류일 때만 다시 묻는다, car-app.md §3). */
+sealed interface ListenResult {
+    data class Heard(val text: String) : ListenResult
+
+    /** 시간 안에 응답 조각이 없었다. STT 초기화 실패도 여기에 넣는다(다시 물어도 같으므로). */
+    data object NoAnswer : ListenResult
+
+    /** 응답 조각 없이 STT 엔진이 오류를 알렸다. */
+    data object EngineError : ListenResult
+}
+
 /** 음성 입출력. 도착 확인 질문(TTS)과 응답 인식(STT). */
 interface VoiceIO {
     /** 다 읽을 때까지 기다린다. 실패하면 false. */
     suspend fun speak(text: String): Boolean
 
-    /** 응답을 듣는다. 무응답·실패면 null. */
-    suspend fun listen(timeoutMs: Long): String?
+    /** 응답을 듣는다. */
+    suspend fun listen(timeoutMs: Long): ListenResult
 
     fun release()
 }
@@ -37,6 +48,7 @@ interface VoiceIO {
  * - STT 결과는 말 사이 쉼마다 completed=true 조각으로 나뉘어 오므로 조각을 모은다.
  *
  * @param debugAudio debug 빌드에서 마이크 대신 넣을 PCM(16kHz·16bit·mono)을 돌려준다. 자동 시연·테스트용.
+ *   STT 오류로 끝나면 다시 물을 때 같은 PCM을 한 번 더 넣는다.
  */
 class PleosVoiceIO(
     private val context: Context,
@@ -44,6 +56,7 @@ class PleosVoiceIO(
 ) : VoiceIO {
     private var tts: TextToSpeech? = null
     private var stt: SpeechToText? = null
+    private var retryDebugPcm: ByteArray? = null
 
     private suspend fun ttsReady(): TextToSpeech? = tts ?: withContext(Dispatchers.Main) {
         val created = TextToSpeech(context.applicationContext, TtsMode.ON_DEVICE)
@@ -118,8 +131,8 @@ class PleosVoiceIO(
         }
     }
 
-    override suspend fun listen(timeoutMs: Long): String? {
-        val engine = sttReady() ?: return null
+    override suspend fun listen(timeoutMs: Long): ListenResult {
+        val engine = sttReady() ?: return ListenResult.NoAnswer
         val collector = SegmentCollector()
         val listener = object : ResultListener {
             override fun onReady() = Unit
@@ -133,19 +146,26 @@ class PleosVoiceIO(
             override fun onEndedRecognition() = Unit
             override fun onError(errorType: SttError) {
                 Log.w(TAG, "STT 오류: $errorType")
+                collector.onFailure()
             }
         }
         withContext(Dispatchers.Main) {
             engine.addListener(listener)
             engine.request()
         }
-        debugAudio?.invoke()?.let { pcm -> injectAudio(engine, pcm) }
+        val pcm = retryDebugPcm ?: debugAudio?.invoke()
+        retryDebugPcm = null
+        pcm?.let { injectAudio(engine, it) }
         val text = collector.await(timeoutMs, GRACE_AFTER_SEGMENT_MS)
         withContext(Dispatchers.Main) {
             engine.stop()
             engine.removeListener(listener)
         }
-        return text
+        return when {
+            text != null -> ListenResult.Heard(text)
+            collector.failedWithoutAnswer -> ListenResult.EngineError.also { retryDebugPcm = pcm }
+            else -> ListenResult.NoAnswer
+        }
     }
 
     /** 실시간 속도(100ms당 3,200바이트)로 넣는다. ON_DEVICE 모드 전용 기능. */
