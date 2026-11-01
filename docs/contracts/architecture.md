@@ -211,7 +211,7 @@ src/
 
 ### 2~6단계 실측 (확인됨 2026-11-02)
 
-- 화면에서 Foreground Service를 `specialUse|microphone`으로 실행 (`types=0x40000080`). 부팅 직후 `microphone` 거부 시 `specialUse`로 실행하도록 구현
+- 화면에서 Foreground Service를 `specialUse|microphone`으로 실행 (`types=0x40000080`). AVD 재부팅 뒤 BOOT_COMPLETED는 `specialUse`만 실행(`types=0x40000000`). 앱 uid 녹음 AppOp `mode=1`(무시)이지만 Pleos 음성 서비스가 자기 uid(`ai.pleos.playground.caas`)로 녹음 시작·허용, PCM 응답 인식·확정까지 **확인됨 (2026-11-02)**. 실제 마이크 음성 입력은 미확인
 - 페어링 → 설정·이용자·동의·집 등록 → 12.4km 업무 운행 음성 확인 → 서버 `HOME→CLIENT`, `BUSINESS/VOICE/VISIT` → 대시보드 표시 → 이번 달 CSV 저장까지 확인
 - 무응답 `UNCONFIRMED/AUTO` 업로드·마스킹 → 차량 화면 '개인' → `PERSONAL/MANUAL` 수정 이력 → 대시보드 '장소 비공개·수정됨' 확인
 - 저장·수정·실패 정책·권한·CSV 열은 [차량 앱 구현 계약](car-app.md)을 따름
@@ -220,7 +220,7 @@ src/
 
 | 항목 | 영향 | 확인 방법 |
 | --- | --- | --- |
-| 부팅 직후 specialUse만 실행한 서비스의 STT 마이크 사용 (미확인) | 도착 질문 음성 입력 | 실패 시 미확인으로 보존, 정차 중 화면 3버튼으로 처리 |
+| 부팅 경로의 실제 마이크 음성 입력 (미확인) | 도착 질문 입력 경로 | specialUse·음성 서비스 자기 uid 녹음·PCM 인식/확정은 확인됨. 실제 마이크는 별도이며 실패 시 미확인·정차 중 3버튼 |
 | 에뮬레이터 호스트 마이크 입력·macOS 마이크 권한 (미확인) | `voice/` 입력 경로 | 이 PC 권한·에뮬레이터 마이크 경로 확인. sendAudio PCM 인식은 확인됨 |
 | STT 엔진 오류 콜백 후 한 번 재질문의 에뮬레이터 실측 (미확인) | 음성 오류 복구 | 단위 테스트는 검증됨. 완료·부분 결과 모두 없을 때 오류 콜백은 재질문, 콜백 없는 크래시는 미확인 |
 
