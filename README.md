@@ -26,7 +26,7 @@ docker compose up -d                                         # 로컬 PostgreSQL
 ```
 
 - `local` 프로필은 개발용 JWT 키·CORS(`http://localhost:5173`)·시드 계정을 씁니다. 시드 계정: `admin@autolog-demo.kr` / `autolog-local-1234` (회사 「오토로그 주식회사」).
-- `./gradlew test`는 Testcontainers로 PostgreSQL을 띄우므로 Docker가 실행 중이어야 합니다.
+- `./gradlew test`는 Testcontainers로 PostgreSQL을 띄우므로 Docker가 실행 중이어야 합니다. Docker가 없으면 PostgreSQL 18을 직접 띄우고 `AUTOLOG_TEST_DB_URL`·`AUTOLOG_TEST_DB_USERNAME`·`AUTOLOG_TEST_DB_PASSWORD`로 지정하면 컨테이너 대신 그 DB를 씁니다(빈 DB 권장). 테스트가 끝나면 JaCoCo 커버리지 보고서가 `build/reports/jacoco/test/html/index.html`에 생깁니다.
 - 운영 환경변수: 필수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`(32바이트 이상), `CORS_ALLOWED_ORIGINS` / 선택 `PORT`, `JWT_EXPIRES_HOURS`, `CONSENT_VERSION`, `SEED_*`. 설명은 [config.md](docs/contracts/config.md)에 있습니다.
 
 ### 대시보드
