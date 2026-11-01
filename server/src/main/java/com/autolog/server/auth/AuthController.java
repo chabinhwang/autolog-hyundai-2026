@@ -27,7 +27,7 @@ public class AuthController {
 		this.rateLimiter = rateLimiter;
 	}
 
-	/** 관리자 로그인. IP당 분당 10회 */
+	/** 관리자 로그인. IP당 분당 10회 + 계정당 15분에 실패 5회 (AuthService) */
 	@PostMapping("/login")
 	public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
 		rateLimiter.check(RateLimiter.Bucket.LOGIN, http.getRemoteAddr());

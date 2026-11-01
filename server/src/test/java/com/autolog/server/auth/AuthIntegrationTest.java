@@ -69,8 +69,9 @@ class AuthIntegrationTest extends IntegrationTest {
 	void loginIsRateLimitedPerIp() throws Exception {
 		TestOrg org = newOrg();
 		String ip = randomIp();
+		// 계정 기준 실패 제한에 걸리지 않도록 매번 다른(없는) 아이디로 실패한다.
 		for (int i = 0; i < 10; i++) {
-			login(org.loginId(), "wrong-password", ip).andExpect(status().isUnauthorized());
+			login("nobody" + i + "@autolog-test.kr", "wrong-password", ip).andExpect(status().isUnauthorized());
 		}
 		login(org.loginId(), "password-1234", ip)
 				.andExpect(status().isTooManyRequests())
@@ -82,6 +83,42 @@ class AuthIntegrationTest extends IntegrationTest {
 		// 1분이 지나면 다시 허용
 		clock.advance(Duration.ofSeconds(61));
 		login(org.loginId(), "password-1234", ip).andExpect(status().isOk());
+	}
+
+	@Test
+	void loginIsLockedPerAccountAfterFiveFailuresRegardlessOfIp() throws Exception {
+		TestOrg org = newOrg();
+		// IP를 매번 바꿔도(X-Forwarded-For 조작과 같은 효과) 계정 기준으로 센다.
+		for (int i = 0; i < 5; i++) {
+			login(org.loginId(), "wrong-password", randomIp()).andExpect(status().isUnauthorized());
+		}
+		login(org.loginId(), "password-1234", randomIp())
+				.andExpect(status().isTooManyRequests())
+				.andExpect(jsonPath("$.error.code").value("RATE_LIMITED"))
+				.andExpect(jsonPath("$.error.message")
+						.value("로그인 실패가 많아 잠시 로그인할 수 없습니다. 15분 후 다시 시도해 주세요."));
+		// 대소문자만 바꾼 아이디도 같은 계정으로 센다.
+		login(org.loginId().toUpperCase(), "password-1234", randomIp()).andExpect(status().isTooManyRequests());
+		// 다른 계정은 영향 없음
+		TestOrg other = newOrg();
+		login(other.loginId(), "password-1234", randomIp()).andExpect(status().isOk());
+		// 첫 실패부터 15분이 지나면 다시 허용
+		clock.advance(Duration.ofMinutes(15).plusSeconds(1));
+		login(org.loginId(), "password-1234", randomIp()).andExpect(status().isOk());
+	}
+
+	@Test
+	void successfulLoginClearsAccountFailures() throws Exception {
+		TestOrg org = newOrg();
+		for (int i = 0; i < 4; i++) {
+			login(org.loginId(), "wrong-password", randomIp()).andExpect(status().isUnauthorized());
+		}
+		login(org.loginId(), "password-1234", randomIp()).andExpect(status().isOk());
+		// 성공으로 기록이 지워져 다시 4번 틀려도 잠기지 않는다.
+		for (int i = 0; i < 4; i++) {
+			login(org.loginId(), "wrong-password", randomIp()).andExpect(status().isUnauthorized());
+		}
+		login(org.loginId(), "password-1234", randomIp()).andExpect(status().isOk());
 	}
 
 	@Test

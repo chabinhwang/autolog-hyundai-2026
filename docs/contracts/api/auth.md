@@ -4,7 +4,7 @@
 
 ## POST /api/v1/auth/login — 관리자 로그인
 
-- 호출: 관리자 / 인증: 없음 / IP당 분당 10회
+- 호출: 관리자 / 인증: 없음 / IP당 분당 10회 + 계정당 15분에 실패 5회 ([rules §1](../rules.md#1-인증))
 - JWT 발급, 만료 12시간, Refresh 없음 (D1)
 
 ### 요청
@@ -48,10 +48,18 @@
 { "success": false, "data": null, "error": { "code": "INVALID_CREDENTIALS", "message": "아이디 또는 비밀번호가 올바르지 않습니다." } }
 ```
 
-### 실패 응답 — 429 Too Many Requests (RATE_LIMITED)
+### 실패 응답 — 429 Too Many Requests (RATE_LIMITED, IP 기준)
 
 ```json
 { "success": false, "data": null, "error": { "code": "RATE_LIMITED", "message": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." } }
+```
+
+### 실패 응답 — 429 Too Many Requests (RATE_LIMITED, 계정 기준)
+
+같은 아이디로 15분 안에 5번 실패한 경우. 비밀번호가 맞아도 이 기간이 끝날 때까지 거절합니다.
+
+```json
+{ "success": false, "data": null, "error": { "code": "RATE_LIMITED", "message": "로그인 실패가 많아 잠시 로그인할 수 없습니다. 15분 후 다시 시도해 주세요." } }
 ```
 
 ## GET /api/v1/auth/me — 현재 관리자 조회

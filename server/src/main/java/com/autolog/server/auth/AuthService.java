@@ -10,6 +10,7 @@ import com.autolog.server.global.error.BusinessException;
 import com.autolog.server.global.error.ErrorCode;
 import com.autolog.server.global.security.AdminPrincipal;
 import com.autolog.server.global.security.JwtService;
+import com.autolog.server.global.security.RateLimiter;
 import com.autolog.server.global.time.Times;
 import java.time.Clock;
 import java.util.Optional;
@@ -24,28 +25,34 @@ public class AuthService {
 	private final OrganizationRepository organizationRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtService jwtService;
+	private final RateLimiter rateLimiter;
 	private final Clock clock;
 	/** 없는 아이디도 같은 시간만큼 BCrypt 비교를 해서 응답 시간으로 계정 존재를 알 수 없게 한다. */
 	private final String dummyHash;
 
 	public AuthService(AdminUserRepository adminUserRepository, OrganizationRepository organizationRepository,
-			PasswordEncoder passwordEncoder, JwtService jwtService, Clock clock) {
+			PasswordEncoder passwordEncoder, JwtService jwtService, RateLimiter rateLimiter, Clock clock) {
 		this.adminUserRepository = adminUserRepository;
 		this.organizationRepository = organizationRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.jwtService = jwtService;
+		this.rateLimiter = rateLimiter;
 		this.clock = clock;
 		this.dummyHash = passwordEncoder.encode("autolog-dummy-password");
 	}
 
+	/** 계정 기준 실패 제한(rules §1): 15분 안에 5번 실패하면 비밀번호가 맞아도 429. 없는 아이디도 똑같이 센다 */
 	@Transactional
 	public LoginResponse login(LoginRequest request) {
+		rateLimiter.checkLoginAllowed(request.loginId());
 		Optional<AdminUser> found = adminUserRepository.findByLoginId(request.loginId());
 		String hash = found.map(AdminUser::getPasswordHash).orElse(dummyHash);
 		boolean matches = passwordEncoder.matches(request.password(), hash);
 		if (found.isEmpty() || !matches) {
+			rateLimiter.recordLoginFailure(request.loginId());
 			throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
 		}
+		rateLimiter.clearLoginFailures(request.loginId());
 		AdminUser admin = found.get();
 		Organization organization = organizationRepository.findById(admin.getOrgId())
 				.orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
