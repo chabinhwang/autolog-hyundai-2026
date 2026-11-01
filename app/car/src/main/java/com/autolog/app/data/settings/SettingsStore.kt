@@ -125,7 +125,7 @@ class SettingsStore(private val context: Context, private val cipher: KeystoreCi
         }
     }
 
-    suspend fun setCurrentDriver(driverId: Long?) {
+    override suspend fun setCurrentDriver(driverId: Long?) {
         context.dataStore.edit { prefs ->
             if (driverId == null) prefs.remove(Keys.CURRENT_DRIVER) else prefs[Keys.CURRENT_DRIVER] = driverId
         }

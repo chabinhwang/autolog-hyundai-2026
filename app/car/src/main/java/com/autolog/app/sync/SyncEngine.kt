@@ -15,6 +15,7 @@ import com.autolog.app.data.remote.ConsentRequest
 import com.autolog.app.data.remote.TripBatchRequest
 import com.autolog.app.data.remote.apiCall
 import com.autolog.app.data.settings.PairedVehicleInfo
+import com.autolog.app.domain.BusinessCategory
 import com.autolog.app.domain.EndpointType
 import com.autolog.app.domain.Purpose
 import com.autolog.app.domain.PurposeSource
@@ -29,6 +30,8 @@ interface SyncSettings {
     suspend fun configSince(): String?
     suspend fun saveConfigSince(serverTime: String, consentVersion: String)
     suspend fun saveVehicle(info: PairedVehicleInfo)
+    suspend fun currentDriverNow(): Long?
+    suspend fun setCurrentDriver(driverId: Long?)
 }
 
 /**
@@ -100,8 +103,12 @@ class SyncEngine(
             when (result) {
                 is ApiResult.Ok -> {
                     result.data.results.forEach { item ->
-                        when (item.result) {
-                            "CREATED", "DUPLICATE" -> markUploaded(item.clientUuid, versions[item.clientUuid] ?: -1)
+                        when {
+                            item.result == "CREATED" || item.result == "DUPLICATE" ->
+                                markUploaded(item.clientUuid, versions[item.clientUuid] ?: -1)
+                            // 이용자가 비활성·삭제된 경우: 트립까지 잃지 않도록 이용자 없이 다시 보낸다.
+                            item.errorCode == "DRIVER_NOT_FOUND" && batch.any { it.clientUuid == item.clientUuid && it.driverId != null } ->
+                                tripDao.clearDriverForRetry(item.clientUuid)
                             else -> tripDao.markFailed(item.clientUuid, item.errorCode ?: "REJECTED")
                         }
                     }
@@ -161,14 +168,26 @@ class SyncEngine(
             PairedVehicleInfo(config.vehicle.id, config.vehicle.regNo, config.vehicle.modelName, config.vehicle.defaultDriverId),
         )
         driverDao.upsertAll(config.drivers.map { DriverEntity(it.id, it.dept, it.name, it.active) })
+        // 선택된 이용자가 비활성이 되면 선택을 푼다(다음 트립이 DRIVER_NOT_FOUND로 거절되지 않게).
+        settings.currentDriverNow()?.let { current ->
+            if (driverDao.find(current)?.active == false) settings.setCurrentDriver(null)
+        }
         placeDao.upsertServerPlaces(
             config.places.mapNotNull { place ->
                 val type = runCatching { EndpointType.valueOf(place.type) }.getOrNull() ?: return@mapNotNull null
                 PlaceEntity(0, place.id, place.name, type, place.lat, place.lng, place.radiusM, place.deleted)
             },
         )
+        // 관리자가 확정·수정한 트립을 차량 화면에도 반영한다(D15, 운전자가 관리자 값을 덮어쓰지 않게).
+        config.tripUpdates.forEach { update ->
+            val purpose = enumOrNull<Purpose>(update.purpose) ?: return@forEach
+            val source = enumOrNull<PurposeSource>(update.purposeSource) ?: return@forEach
+            tripDao.applyServerPurpose(update.clientUuid, purpose, source, update.businessCategory?.let { enumOrNull<BusinessCategory>(it) })
+        }
         settings.saveConfigSince(config.serverTime, config.consentVersion)
     }
+
+    private inline fun <reified E : Enum<E>> enumOrNull(name: String): E? = runCatching { enumValueOf<E>(name) }.getOrNull()
 
     private companion object {
         const val BATCH_SIZE = 50

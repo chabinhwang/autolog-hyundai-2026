@@ -37,6 +37,16 @@ data class ConfigResponse(
     val vehicle: ConfigVehicle,
     val drivers: List<ConfigDriver>,
     val places: List<ConfigPlace>,
+    /** 관리자가 수정한 이 차량 트립의 현재 용도 (rules §5). 이전 서버와 호환되도록 기본값은 빈 목록. */
+    val tripUpdates: List<ConfigTripUpdate> = emptyList(),
+)
+
+@Serializable
+data class ConfigTripUpdate(
+    val clientUuid: String,
+    val purpose: String,
+    val purposeSource: String,
+    val businessCategory: String? = null,
 )
 
 @Serializable

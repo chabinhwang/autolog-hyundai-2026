@@ -87,6 +87,19 @@ class FakeTripDao : TripDao {
         return 1
     }
 
+    override suspend fun applyServerPurpose(uuid: String, purpose: Purpose, source: PurposeSource, category: BusinessCategory?): Int {
+        val t = rows.value[uuid] ?: return 0
+        put(t.copy(purpose = purpose, purposeSource = source, businessCategory = category, answerPending = false))
+        return 1
+    }
+
+    override suspend fun clearDriverForRetry(uuid: String) {
+        val t = rows.value[uuid] ?: return
+        put(t.copy(driverId = null, syncState = SyncState.PENDING, syncErrorCode = null))
+    }
+
+    override fun observeFailedCount(): Flow<Int> = rows.map { it.values.count { t -> t.syncState == SyncState.FAILED } }
+
     override suspend fun releaseStaleAnswers() {
         rows.value = rows.value.mapValues { (_, t) -> t.copy(answerPending = false) }
     }
@@ -173,6 +186,7 @@ class FakeSettings(var token: String? = "device-token") : SyncSettings {
     var since: String? = null
     var consentVersion: String? = null
     var vehicle: PairedVehicleInfo? = null
+    var currentDriver: Long? = null
     override suspend fun deviceToken() = token
     override suspend fun clearDeviceToken() {
         token = null
@@ -184,5 +198,9 @@ class FakeSettings(var token: String? = "device-token") : SyncSettings {
     }
     override suspend fun saveVehicle(info: PairedVehicleInfo) {
         vehicle = info
+    }
+    override suspend fun currentDriverNow() = currentDriver
+    override suspend fun setCurrentDriver(driverId: Long?) {
+        currentDriver = driverId
     }
 }

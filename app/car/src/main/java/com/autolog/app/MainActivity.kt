@@ -105,6 +105,7 @@ private fun Home(viewModel: MainViewModel, onRepair: () -> Unit) {
     val drivers by viewModel.drivers.collectAsState()
     val status by viewModel.recorderStatus.collectAsState()
     val pending by viewModel.pendingCount.collectAsState()
+    val failed by viewModel.failedCount.collectAsState()
     val unconfirmed by viewModel.unconfirmed.collectAsState()
     val recent by viewModel.recentTrips.collectAsState()
     val places by viewModel.places.collectAsState()
@@ -119,6 +120,7 @@ private fun Home(viewModel: MainViewModel, onRepair: () -> Unit) {
             driver = driver,
             status = status,
             pendingCount = pending,
+            failedCount = failed,
             unconfirmed = unconfirmed,
             recent = recent,
             homeRegistered = places.any { it.type == EndpointType.HOME },

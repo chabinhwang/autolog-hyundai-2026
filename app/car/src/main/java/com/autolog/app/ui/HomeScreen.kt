@@ -49,6 +49,7 @@ data class HomeState(
     val driver: DriverEntity?,
     val status: TripRecorder.Status,
     val pendingCount: Int,
+    val failedCount: Int,
     val unconfirmed: List<TripEntity>,
     val recent: List<TripEntity>,
     val homeRegistered: Boolean,
@@ -77,7 +78,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
                 OutlinedButton(onClick = actions.repair, modifier = Modifier.weight(1f).height(TouchTarget)) { Text("차량 다시 등록") }
             }
         }
-        RecentCard(state.recent, state.pendingCount, Modifier.weight(1.15f).fillMaxHeight())
+        RecentCard(state.recent, state.pendingCount, state.failedCount, Modifier.weight(1.15f).fillMaxHeight())
     }
 }
 
@@ -155,15 +156,16 @@ private fun PurposeButton(label: String, color: Color, modifier: Modifier, onCli
 }
 
 @Composable
-private fun RecentCard(trips: List<TripEntity>, pendingCount: Int, modifier: Modifier) {
+private fun RecentCard(trips: List<TripEntity>, pendingCount: Int, failedCount: Int, modifier: Modifier) {
     Card(modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("최근 운행", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            Text(
-                if (pendingCount > 0) "전송 대기 ${pendingCount}건" else "모두 전송됨",
-                color = if (pendingCount > 0) AutoLogColors.Unconfirmed else AutoLogColors.Ok,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            val (label, color) = when {
+                failedCount > 0 -> "전송 실패 ${failedCount}건" + (if (pendingCount > 0) " · 대기 ${pendingCount}건" else "") to AutoLogColors.Error
+                pendingCount > 0 -> "전송 대기 ${pendingCount}건" to AutoLogColors.Unconfirmed
+                else -> "모두 전송됨" to AutoLogColors.Ok
+            }
+            Text(label, color = color, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(12.dp))
         if (trips.isEmpty()) {

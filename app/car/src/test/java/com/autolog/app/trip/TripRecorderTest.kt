@@ -143,7 +143,8 @@ class TripRecorderTest {
         withTimeout(2_000) { while (voice.spoken.size < 2) delay(20) }
         assertEquals("본사 도착, 12.4킬로미터. 출근으로 기록할까요?", voice.spoken[0])
         assertEquals("출퇴근으로 기록했어요.", voice.spoken[1])
-        assertTrue(syncRequests >= 1)
+        // 주행 시작 때 한 번(설정 미리 받기), 저장 후 한 번
+        assertTrue("syncRequests=$syncRequests", syncRequests >= 2)
     }
 
     @Test

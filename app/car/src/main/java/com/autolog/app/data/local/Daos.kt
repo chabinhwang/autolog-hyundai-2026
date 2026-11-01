@@ -60,6 +60,20 @@ interface TripDao {
         destLabel: String?,
     ): Int
 
+    /** 서버(관리자 수정)의 현재 값으로 덮어쓴다. 수정 이력을 만들지 않고 동기화 상태도 바꾸지 않는다. */
+    @Query(
+        """UPDATE trip SET purpose = :purpose, purposeSource = :source, businessCategory = :category,
+           answerPending = 0 WHERE clientUuid = :uuid""",
+    )
+    suspend fun applyServerPurpose(uuid: String, purpose: Purpose, source: PurposeSource, category: BusinessCategory?): Int
+
+    /** 서버가 직원을 찾지 못한 트립은 이용자 없이 다시 보낸다(기록 누락 방지). */
+    @Query("UPDATE trip SET driverId = NULL, syncState = 'PENDING', syncErrorCode = NULL WHERE clientUuid = :uuid")
+    suspend fun clearDriverForRetry(uuid: String)
+
+    @Query("SELECT COUNT(*) FROM trip WHERE syncState = 'FAILED'")
+    fun observeFailedCount(): Flow<Int>
+
     /** 앱이 질문 중에 꺼졌던 트립은 미확인으로 남기고 업로드 대상으로 돌린다. */
     @Query("UPDATE trip SET answerPending = 0 WHERE answerPending = 1")
     suspend fun releaseStaleAnswers()

@@ -84,7 +84,11 @@ class TripRecorder(
         persistState()
         when (event) {
             null -> Unit
-            is TripDetector.Event.TripStarted -> _status.value = Status(driving = true, lastMessage = null)
+            is TripDetector.Event.TripStarted -> {
+                _status.value = Status(driving = true, lastMessage = null)
+                // 주행 중에 설정(관리자가 추가한 장소·직원 변경)을 받아 두어 도착 판정에 쓴다.
+                requestSync()
+            }
             is TripDetector.Event.TripCompleted -> {
                 _status.value = _status.value.copy(driving = false)
                 complete(event.trip)

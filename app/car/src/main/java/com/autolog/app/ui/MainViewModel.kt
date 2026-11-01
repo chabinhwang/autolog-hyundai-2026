@@ -58,6 +58,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val recentTrips: StateFlow<List<TripEntity>> = db.tripDao().observeRecent(50).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val unconfirmed: StateFlow<List<TripEntity>> = db.tripDao().observeUnconfirmed().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val failedCount: StateFlow<Int> = db.tripDao().observeFailedCount().stateIn(viewModelScope, SharingStarted.Eagerly, 0)
     val pendingCount: StateFlow<Int> = db.tripDao().observePendingCount().stateIn(viewModelScope, SharingStarted.Eagerly, 0)
     val places: StateFlow<List<PlaceEntity>> = db.placeDao().observeActive().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val recorderStatus = container.recorderStatus

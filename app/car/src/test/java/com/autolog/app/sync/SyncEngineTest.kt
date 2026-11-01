@@ -173,6 +173,54 @@ class SyncEngineTest {
         assertEquals(SyncState.PENDING, edits.rows.getValue("e1").syncState)
     }
 
+    private fun configWith(drivers: String = "[]", tripUpdates: String = "[]") = json(
+        200,
+        """{"success":true,"data":{"serverTime":"2026-11-03T09:00:00+09:00","consentVersion":"2026-11-01",
+           "vehicle":{"id":3,"regNo":"12가3456","modelName":null,"defaultDriverId":null},
+           "drivers":$drivers,"places":[],"tripUpdates":$tripUpdates},"error":null}""",
+    )
+
+    @Test
+    fun `관리자가 확정한 트립은 로컬 값을 덮어쓰고 수정 이력을 만들지 않는다`() = runBlocking {
+        trips.insert(Fixtures.trip("a").copy(purpose = Purpose.UNCONFIRMED, purposeSource = PurposeSource.AUTO, syncState = SyncState.SYNCED))
+        server.enqueue(
+            configWith(tripUpdates = """[{"clientUuid":"a","purpose":"BUSINESS","purposeSource":"ADMIN","businessCategory":"OTHER"},
+                {"clientUuid":"없는트립","purpose":"COMMUTE","purposeSource":"ADMIN","businessCategory":null}]"""),
+        )
+
+        assertEquals(SyncEngine.Outcome.SUCCESS, engine().run())
+
+        val trip = trips.find("a")!!
+        assertEquals(Purpose.BUSINESS, trip.purpose)
+        assertEquals(PurposeSource.ADMIN, trip.purposeSource)
+        assertEquals(com.autolog.app.domain.BusinessCategory.OTHER, trip.businessCategory)
+        assertEquals(SyncState.SYNCED, trip.syncState)
+        assertTrue(edits.rows.isEmpty())
+    }
+
+    @Test
+    fun `선택된 이용자가 비활성이 되면 선택을 푼다`() = runBlocking {
+        settings.currentDriver = 11
+        server.enqueue(configWith(drivers = """[{"id":11,"dept":"영업1팀","name":"김영업","active":false}]"""))
+        engine().run()
+        assertNull(settings.currentDriver)
+    }
+
+    @Test
+    fun `직원을 찾지 못해 거절되면 이용자 없이 다시 보내 기록을 살린다`() = runBlocking {
+        trips.insert(Fixtures.trip("a"))
+        server.enqueue(uploadResults(Triple("a", "REJECTED", "DRIVER_NOT_FOUND")))
+        server.enqueue(uploadResults(Triple("a", "CREATED", null)))
+        server.enqueue(json(200, configBody))
+
+        assertEquals(SyncEngine.Outcome.SUCCESS, engine().run())
+
+        assertTrue(server.takeRequest().body.readUtf8().contains("\"driverId\":11"))
+        assertTrue(server.takeRequest().body.readUtf8().contains("\"driverId\":null"))
+        assertEquals(SyncState.SYNCED, trips.find("a")!!.syncState)
+        assertNull(trips.find("a")!!.driverId)
+    }
+
     @Test
     fun `동의 기록을 먼저 보낸다`() = runBlocking {
         consents.insert(ConsentEntity(11, "2026-11-01", Instant.parse("2026-11-02T23:10:00Z"), synced = false))
