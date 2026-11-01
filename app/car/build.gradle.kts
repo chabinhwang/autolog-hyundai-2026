@@ -20,10 +20,17 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://autolog-api.aihub.io.kr\"")
+        // P(주차) 유지 시간이 지나면 운행 종료로 확정 (car-app-rules.md: 3분)
+        buildConfigField("int", "PARK_CONFIRM_SECONDS", "180")
     }
 
     buildTypes {
+        debug {
+            // 에뮬레이터 → 호스트 로컬 서버. 시연·검증 시간을 줄이려고 종료 확정을 30초로 줄인다.
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080\"")
+            buildConfigField("int", "PARK_CONFIRM_SECONDS", "30")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -36,6 +43,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    testOptions {
+        // android.util.Log 등 프레임워크 호출이 JVM 단위 테스트에서 예외 대신 기본값을 돌려주게 한다.
+        unitTests.isReturnDefaultValues = true
     }
 
     buildFeatures {

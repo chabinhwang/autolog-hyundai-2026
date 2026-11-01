@@ -8,7 +8,9 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.autolog.app.pairing.KeystoreCipher
+import com.autolog.app.pairing.PairingSettings
 import com.autolog.app.sync.SyncSettings
+import com.autolog.app.trip.RecorderSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -43,7 +45,7 @@ data class OngoingTrip(
 /**
  * 작은 설정값 저장소(DataStore). 기기 토큰은 Keystore로 암호화해 저장한다(D14).
  */
-class SettingsStore(private val context: Context, private val cipher: KeystoreCipher = KeystoreCipher()) : SyncSettings {
+class SettingsStore(private val context: Context, private val cipher: KeystoreCipher = KeystoreCipher()) : SyncSettings, PairingSettings, RecorderSettings {
     private object Keys {
         val INSTALLATION_ID = stringPreferencesKey("installation_id")
         val DEVICE_TOKEN = stringPreferencesKey("device_token_enc")
@@ -65,7 +67,12 @@ class SettingsStore(private val context: Context, private val cipher: KeystoreCi
 
     val consentVersion: Flow<String?> = context.dataStore.data.map { it[Keys.CONSENT_VERSION] }
 
-    suspend fun installationId(): String {
+    suspend fun currentConsentVersion(): String? = consentVersion.first()
+
+    /** 페어링 여부. 기기 토큰이 있으면 페어링된 것으로 본다. */
+    val paired: Flow<Boolean> = context.dataStore.data.map { it[Keys.DEVICE_TOKEN] != null }
+
+    override suspend fun installationId(): String {
         context.dataStore.data.first()[Keys.INSTALLATION_ID]?.let { return it }
         val created = UUID.randomUUID().toString()
         context.dataStore.edit { it[Keys.INSTALLATION_ID] = created }
@@ -73,7 +80,7 @@ class SettingsStore(private val context: Context, private val cipher: KeystoreCi
     }
 
     /** 페어링 시작: 새 토큰을 암호화해 임시 보관한다(이전 토큰 재사용 안 함). */
-    suspend fun savePairingToken(token: String) {
+    override suspend fun savePairingToken(token: String) {
         val encrypted = cipher.encrypt(token)
         context.dataStore.edit { it[Keys.PAIRING_TOKEN] = encrypted }
     }
@@ -82,7 +89,7 @@ class SettingsStore(private val context: Context, private val cipher: KeystoreCi
         context.dataStore.data.first()[Keys.PAIRING_TOKEN]?.let(cipher::decrypt)
 
     /** PAIRED 확인 후 임시 토큰을 기기 토큰으로 올리고, 이전 차량의 동기화 기준을 지운다. */
-    suspend fun promotePairingToken() {
+    override suspend fun promotePairingToken() {
         context.dataStore.edit { prefs ->
             prefs[Keys.PAIRING_TOKEN]?.let { prefs[Keys.DEVICE_TOKEN] = it }
             prefs.remove(Keys.PAIRING_TOKEN)
@@ -107,7 +114,7 @@ class SettingsStore(private val context: Context, private val cipher: KeystoreCi
         context.dataStore.edit { it[Keys.VEHICLE] = json.encodeToString(PairedVehicleInfo.serializer(), info) }
     }
 
-    suspend fun vehicleNow(): PairedVehicleInfo? = vehicle.first()
+    override suspend fun vehicleNow(): PairedVehicleInfo? = vehicle.first()
 
     override suspend fun configSince(): String? = context.dataStore.data.first()[Keys.CONFIG_SINCE]
 
@@ -124,12 +131,12 @@ class SettingsStore(private val context: Context, private val cipher: KeystoreCi
         }
     }
 
-    suspend fun currentDriverNow(): Long? = currentDriverId.first()
+    override suspend fun currentDriverNow(): Long? = currentDriverId.first()
 
-    suspend fun ongoingTrip(): OngoingTrip? =
+    override suspend fun ongoingTrip(): OngoingTrip? =
         context.dataStore.data.first()[Keys.ONGOING_TRIP]?.let { runCatching { json.decodeFromString<OngoingTrip>(it) }.getOrNull() }
 
-    suspend fun saveOngoingTrip(trip: OngoingTrip?) {
+    override suspend fun saveOngoingTrip(trip: OngoingTrip?) {
         context.dataStore.edit { prefs ->
             if (trip == null) prefs.remove(Keys.ONGOING_TRIP) else prefs[Keys.ONGOING_TRIP] = json.encodeToString(OngoingTrip.serializer(), trip)
         }

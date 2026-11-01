@@ -44,7 +44,9 @@ suspend fun <T> apiCall(block: suspend () -> retrofit2.Response<ApiEnvelope<T>>)
 /** 기기 토큰이 있으면 Authorization 헤더를 붙인다. 페어링 코드 발급·상태 조회는 토큰 없이 호출된다. */
 class DeviceAuthInterceptor(private val tokenProvider: () -> String?) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val token = tokenProvider()
+        // 페어링 코드 발급·조회는 인증 없는 API. 폐기된 이전 토큰이 섞여 401이 나지 않게 헤더를 붙이지 않는다.
+        val public = chain.request().url.encodedPath.contains("/devices/pairing-codes")
+        val token = if (public) null else tokenProvider()
         val request = if (token == null) {
             chain.request()
         } else {
