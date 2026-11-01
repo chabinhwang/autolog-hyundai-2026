@@ -36,13 +36,17 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
         private val networkConstraint = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
-        /** 트립·수정 저장 직후, 앱 시작 시 호출. 이미 대기 중이면 하나로 합친다. */
+        /**
+         * 트립·수정 저장 직후, 주행 시작·앱 시작 시 호출.
+         * REPLACE: 서버 장애로 백오프 대기 중인 이전 작업 뒤에 붙으면 장애가 끝나도 새 기록이 그 백오프만큼
+         * 늦게 올라간다(에뮬레이터에서 확인). 새 요청으로 대체해 바로 실행한다. 업로드는 clientUuid로 멱등이다.
+         */
         fun requestNow(context: Context) {
             val request = OneTimeWorkRequestBuilder<SyncWorker>()
                 .setConstraints(networkConstraint)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE_NOW, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+            WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE_NOW, ExistingWorkPolicy.REPLACE, request)
         }
 
         /** 15분 주기(WorkManager 최소값). 관리자가 바꾼 장소·직원을 내려받는다. */
