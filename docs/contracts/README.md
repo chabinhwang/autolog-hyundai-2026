@@ -37,6 +37,7 @@
 | D12 | 환경변수·시드 (G3) | 서버 설정은 전부 환경변수. 회사·관리자 시드는 서버 시작 시 같은 사업자등록번호가 없을 때만 생성 ([config.md](config.md)) | 운영 Compose에서 이미지 하나로 회사별 시드 가능 |
 | D13 | 보유 기간·동의 (G4) | 서버 운행 기록 5년 보유(국세기본법 장부 보존 기간 기준, 미확인). 직원별 동의를 차량 앱에서 받고 서버에 기록 ([rules §11](rules.md#11-개인정보-보유삭제동의-d13)) | 개인정보처리방침·동의 화면에 보유 기간이 필수 |
 | D14 | 기기 토큰 저장 (G5) | Android Keystore의 AES-GCM 키로 암호화해 DataStore에 저장 | `androidx.security:security-crypto`(EncryptedSharedPreferences)는 1.1.0에서 전 API 지원 중단, Keystore 직접 사용 권장 ([릴리스 노트](https://developer.android.com/jetpack/androidx/releases/security)) |
+| D15 | 관리자의 미확인 운행 확정 (**검토 필요**) | 1차는 허용. 관리자는 미확인 운행의 용도를 `COMMUTE`·`BUSINESS`로만 바꿀 수 있고, 바꾸면 마스킹이 풀려 집·미등록 라벨·메모·시각이 보임 ([rules §4](rules.md#4-수정-post-tripsclientuuidedits)) | 미확인이 남으면 업무비율을 확정할 수 없음. 다만 개인 운행 우회(D4)와 같은 성격의 위험이 있어, 운전자 확인 요청(2차) 도입 때 관리자 확정을 막을지 다시 정함 |
 
 ## 공통 규칙
 
@@ -50,9 +51,10 @@
 | 사용일자 | `tripDate` = `startedAt`의 Asia/Seoul 날짜. 서버가 계산 |
 | 거리 | km, 소수 첫째 자리 number. 주행거리는 서버가 계산(주행 후 − 주행 전) |
 | 식별자 | 서버 엔티티는 number id. 트립은 차량 앱이 만든 `clientUuid`(UUID v4)만 외부에 노출 |
-| 페이지 | 쿼리 `page`(0부터), `size`(기본 20, 최대 100). 응답 `data` = `{ content, page, size, totalElements, totalPages }` |
+| 기간 | 조회·내보내기 기간 `from`~`to`는 날짜 포함 최대 366일 (`to` ≤ `from` + 365일). 윤년 1년도 허용 |
+| 페이지 | 쿼리 `page`(0부터), `size`(기본 20, 1~100. 범위 밖은 400 `VALIDATION_FAILED`). 응답 `data` = `{ content, page, size, totalElements, totalPages }` |
 | 회사 범위 | 관리자 요청은 JWT의 `orgId`로, 차량 요청은 기기 토큰의 차량으로 범위를 정함. 요청 본문의 회사·차량 ID는 신뢰하지 않음. 다른 회사 리소스는 403 대신 404 (존재 여부 비노출) |
-| CORS | 허용 출처는 D8. 메서드 GET·POST·PUT·PATCH·DELETE, 헤더 Authorization·Content-Type. 자격 증명(쿠키) 없음 |
+| CORS | 허용 출처는 D8. 메서드 GET·POST·PUT·PATCH·DELETE, 헤더 Authorization·Content-Type. 노출 헤더(`Access-Control-Expose-Headers`) `Content-Disposition` (기록부 파일명). 자격 증명(쿠키) 없음 |
 
 ```json
 { "success": true, "data": { }, "error": null }
@@ -77,7 +79,8 @@
 | 401 | `DEVICE_TOKEN_INVALID` | 등록되지 않았거나 연결 해제된 기기 토큰 |
 | 403 | `FORBIDDEN` | 인증은 됐지만 호출 주체가 맞지 않음 (예: 기기 토큰으로 관리자 API) |
 | 403 | `PERSONAL_TRIP_ADMIN_EDIT_FORBIDDEN` | 관리자가 개인 운행 수정 시도 (D4) |
-| 404 | `NOT_FOUND` | 경로 없음 |
+| 404 | `NOT_FOUND` | 경로 없음 (인증이 필요한 경로 아래는 토큰이 없으면 먼저 401) |
+| 405 | `METHOD_NOT_ALLOWED` | 경로는 있지만 지원하지 않는 HTTP 메서드 |
 | 404 | `TRIP_NOT_FOUND` · `VEHICLE_NOT_FOUND` · `DRIVER_NOT_FOUND` · `PLACE_NOT_FOUND` · `PAIRING_NOT_FOUND` · `DEVICE_NOT_FOUND` | 해당 리소스 없음 (다른 회사 소유 포함) |
 | 409 | `VEHICLE_REG_NO_DUPLICATE` | 같은 회사에 같은 자동차등록번호 존재 |
 | 429 | `RATE_LIMITED` | 요청 횟수 제한 초과 |

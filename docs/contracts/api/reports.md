@@ -71,7 +71,8 @@
 
 - Query: `vehicleId` (필수), `from`, `to` (필수, `YYYY-MM-DD`, 날짜 포함), `format` (선택, 기본 `xlsx`)
 - 예: `GET /api/v1/reports/logbook?vehicleId=3&from=2026-01-01&to=2026-12-31&format=xlsx`
-- 대시보드는 `fetch`로 받아 Blob 다운로드 (Authorization 헤더가 필요해 `<a href>` 직접 링크 불가)
+- 대시보드는 `fetch`로 받아 Blob 다운로드 (Authorization 헤더가 필요해 `<a href>` 직접 링크 불가). 출처가 달라도 파일명을 읽을 수 있게 서버는 CORS 노출 헤더에 `Content-Disposition`을 넣음
+- 비활성 차량도 내보낼 수 있음
 
 ### 성공 응답 — 200 OK (파일)
 

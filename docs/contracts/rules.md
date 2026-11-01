@@ -38,6 +38,10 @@
 
 - 코드 발급은 인증이 없으므로 IP당 분당 10회 제한
 - 대기 중(PENDING) 코드끼리는 중복 없음
+- 같은 `installationId`로 새 코드를 발급하면 그 설치의 이전 대기 코드는 EXPIRED
+- 이미 기기에 쓰인 `tokenHash`의 코드로 페어링하면 400 `PAIRING_CODE_INVALID` (차량 앱은 페어링마다 새 토큰)
+- 비활성 차량은 페어링할 수 없음 → 404 `VEHICLE_NOT_FOUND`
+- 페어링하면 같은 회사에서 같은 `installationId`를 쓰던 다른 차량의 활성 기기도 폐기 (앱을 다른 차량으로 옮겼을 때 이전 차량이 연결된 것으로 남지 않게)
 
 ### 재페어링 (D10)
 
@@ -61,6 +65,8 @@
   - `driverId`는 같은 회사의 활성 직원(`DRIVER_NOT_FOUND`), `placeId`는 같은 회사의 장소(`PLACE_NOT_FOUND`)
   - COMPANY·CLIENT는 `placeId` 필수, HOME·UNREGISTERED는 `placeId` null
   - COMPANY·CLIENT의 라벨은 서버가 장소 이름으로 채움 (요청 라벨 무시). HOME은 '집', UNREGISTERED는 요청 라벨(NaviHelper 목적지명) 또는 null
+  - 같은 회사 장소면 삭제된 장소도 받음 (차량이 오프라인인 동안 삭제된 경우). 장소의 `type`과 출발·도착 유형이 같은지는 검사하지 않음
+  - `purpose = BUSINESS`이고 `businessCategory`가 null이면 그대로 저장 (기본값 `OTHER`는 수정 때만 적용)
 - 0.5km 미만 병합은 차량 앱 규칙. 서버는 주행거리 0 이상이면 받음
 - 업로드 요청 성공 시 `device.last_synced_at` 갱신
 
@@ -70,10 +76,14 @@
 - 요청 1건 = 이력 1행 (`changes`에 바뀐 필드 전부). 값이 같은 필드는 이력에서 제외하고, 바뀐 게 없으면 이력 없이 현재값 반환
 - `purpose`를 BUSINESS가 아닌 값으로 바꾸면 `businessCategory`는 자동으로 null (이력에 함께 기록)
 - `purpose`를 BUSINESS로 바꾸면서 `businessCategory`가 없으면 `OTHER`
-- 판정 출처: 차량 수정은 요청의 `purposeSource`(`MANUAL`/`VOICE`), 관리자 수정은 `ADMIN`. 용도를 바꾸지 않는 수정은 판정 출처 유지
-- 차량: 자기 차량의 트립만(다른 차량 트립은 404), `clientEditUuid` 필수. 같은 키 재전송 → 처음 결과 그대로 200
+- 수정 후 용도가 BUSINESS가 아닌데 `businessCategory` 값을 보내면 400 `VALIDATION_FAILED`
+- `purpose`를 `UNCONFIRMED`로 바꾸는 수정은 400 `VALIDATION_FAILED` (미확인은 차량 추정값 전용)
+- 판정 출처: 차량 수정은 요청의 `purposeSource`(`MANUAL`/`VOICE`, 용도를 바꾸는데 없으면 400), 관리자 수정은 `ADMIN`. 용도를 바꾸지 않는 수정은 판정 출처 유지
+- 차량: 자기 차량의 트립만(다른 차량 트립은 404), `clientEditUuid` 필수. 같은 키 재전송 → 200, `edit`는 처음 만든 이력, `current`는 지금 값 (바뀐 게 없던 요청은 이력이 없으므로 다시 평가)
 - 차량 수정의 `editedAt`이 서버 수신 시각 + 10분보다 미래면 400 `VALIDATION_FAILED` (D11)
-- 관리자: `reason` 필수(400 `EDIT_REASON_REQUIRED`), 현재 용도가 PERSONAL이면 403 `PERSONAL_TRIP_ADMIN_EDIT_FORBIDDEN`(D4). 관리자는 용도를 PERSONAL로 바꿀 수도 없음 (개인 여부는 운전자가 판단, 제안)
+- 관리자: `reason` 필수(400 `EDIT_REASON_REQUIRED`), 현재 용도가 PERSONAL이면 403 `PERSONAL_TRIP_ADMIN_EDIT_FORBIDDEN`(D4). 관리자는 용도를 `COMMUTE`·`BUSINESS`로만 바꿀 수 있음: PERSONAL로 바꾸면 403 `PERSONAL_TRIP_ADMIN_EDIT_FORBIDDEN` (개인 여부는 운전자가 판단), UNCONFIRMED는 위 규칙대로 400
+- 관리자 수정 응답(`current`, `edit.changes`)도 §7 마스킹을 **수정 후** 용도 기준으로 적용. 미확인 운행을 업무·출퇴근으로 확정하면 그때부터 장소·메모·시각이 보임 (D15, 검토 필요)
+- 대시보드는 가려진 메모(미확인 운행)를 관리자가 수정하지 못하게 막음 (원래 값을 모른 채 덮어쓰는 것 방지)
 - 현재값 = 서버 수신 순서상 마지막 이력. 차량·관리자 수정이 겹쳐도 둘 다 이력에 남음
 - 트립보다 수정이 먼저 도착 → 404 `TRIP_NOT_FOUND` → 차량 앱은 트립 업로드 후 재시도
 
@@ -82,6 +92,8 @@
 - `since` 없음 → 전체. 있으면 그 시각 이후 `updated_at`이 바뀐 직원·장소만
 - 삭제·비활성도 전달: 장소 `deleted: true`, 직원 `active: false`
 - 응답의 `serverTime`을 다음 요청의 `since`로 사용 (차량 시계와 무관)
+- `serverTime`은 초 단위 내림, 비교는 `updated_at >= since` (같은 초의 변경은 다음 응답에 다시 올 수 있으므로 차량 앱은 id 기준으로 덮어씀)
+- `since`가 없을 때도 비활성 직원·삭제된 장소를 포함 (차량 앱 로컬 목록 정리용)
 - 차량 정보와 현재 동의 문서 버전(`consentVersion`)은 항상 포함
 
 ## 6. 차량 앱 동기화 (참고)
@@ -100,11 +112,13 @@
 | 현재 용도 | 보이는 것 | 가리는 것 (null로 응답) |
 | --- | --- | --- |
 | PERSONAL | 사용일자, 직원, 주행 전/후 계기판 거리, 주행거리, '개인' | 출발·도착 라벨·장소, 메모, 시작·종료 시각(시:분), 이력의 메모 값 |
-| UNCONFIRMED | 위와 같음 + 회사·거래처 라벨 | HOME·UNREGISTERED 라벨, 메모, 시작·종료 시각 |
+| UNCONFIRMED | 위와 같음 + 회사·거래처 출발·도착 | HOME·UNREGISTERED 출발·도착(유형까지 null), 메모, 시작·종료 시각, 이력의 메모 값 |
 | COMMUTE | 전부 (HOME은 '집') | - |
 | BUSINESS | 전부 | - |
 
 - 가린 항목이 있으면 응답에 `masked: true` → 대시보드는 '장소 비공개'로 표시
+- 시각을 가리는 운행(PERSONAL·UNCONFIRMED)은 상세의 `recordedAt`·`syncedAt`도 null (시:분이 드러나므로)
+- 이력 `changes[].before/after`에서 가린 값은 null. `driverId`는 number id 또는 null
 - 계기판 거리는 개인 운행도 공개 (기록 누락 탐지와 서식 ⑤⑥ 연속성에 필요)
 
 ## 8. 대시보드 집계 (`GET /dashboard/summary`)
@@ -119,15 +133,18 @@
   - `UNCONFIRMED_EXISTS`: 미확인 1건 이상
   - `SYNC_DELAYED`: 마지막 동기화 48시간 초과 (페어링된 차량만)
   - `ODO_GAP`: 같은 차량에서 직전 트립 주행 후 거리와 다음 트립 주행 전 거리 차이 1km 초과 (앱 미실행 구간 의심)
+- 합계(`totals`)는 활성 차량의 트립만 더함
+- `lastSyncedAt`은 연결 해제된 기기를 포함한 그 차량의 최댓값. `SYNC_DELAYED`는 활성 기기의 `last_synced_at`(없으면 `paired_at`) 기준
 
 ## 9. 기록부 내보내기 (`GET /reports/logbook`, D7)
 
 - 차량 1대 + 기간(`from`~`to`, 날짜 포함, 최대 366일). 1차는 XLSX만
+- 비활성 차량도 내보낼 수 있음 (과거 기록 보존)
 - 파일명: `운행기록부_{자동차등록번호}_{from}_{to}.xlsx` (Content-Disposition에 RFC 5987 `filename*` 사용)
 - 상단: 과세기간(from~to), 상호명, 사업자등록번호, ① 차종, ② 자동차등록번호
 - 행(시작 시각순): ③ 사용일자(요일) · ④ 부서 · ④ 성명 · ⑤ 주행 전 · ⑥ 주행 후 · ⑦ 주행거리 · ⑧ 출퇴근용 · ⑨ 일반 업무용 · ⑩ 비고
-- ⑩ 비고: BUSINESS = 업무 세부 + 도착지 라벨 + 메모 / COMMUTE = '출퇴근' / PERSONAL = 빈칸 / UNCONFIRMED = '미확인'
-- 하단: ⑪ 총주행거리, ⑫ 업무용 사용거리, ⑬ 업무사용비율
+- ⑩ 비고: BUSINESS = 업무 세부 + 도착지 라벨 + 메모 (구분자 ` / `) / COMMUTE = '출퇴근' / PERSONAL = 빈칸 / UNCONFIRMED = '미확인'
+- 하단: ⑪ 총주행거리, ⑫ 업무용 사용거리, ⑬ 업무사용비율 (총주행거리 0이면 '-')
 - 미확인 포함 시 시트 상단에 경고 문구
 - 마스킹 규칙(7번) 그대로 적용
 

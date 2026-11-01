@@ -79,7 +79,7 @@
 ## POST /api/v1/devices/pair — 차량 페어링
 
 - 호출: 관리자 / 인증: 관리자 JWT / 관리자당 분당 10회
-- 같은 차량의 기존 활성 기기는 폐기됩니다.
+- 같은 차량의 기존 활성 기기는 폐기됩니다. 같은 회사에서 같은 `installationId`를 쓰던 다른 차량의 활성 기기도 폐기됩니다 ([rules §2](../rules.md#2-페어링-d6)).
 
 ### 요청
 
@@ -122,6 +122,8 @@
 ```
 
 ### 실패 응답 — 404 Not Found (VEHICLE_NOT_FOUND)
+
+다른 회사 차량이거나 비활성 차량.
 
 ```json
 { "success": false, "data": null, "error": { "code": "VEHICLE_NOT_FOUND", "message": "차량을 찾을 수 없습니다." } }

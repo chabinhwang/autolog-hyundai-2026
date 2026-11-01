@@ -92,7 +92,7 @@
 #### 요청
 
 - 보낸 필드만 바뀝니다: `regNo`, `modelName`, `defaultDriverId`(null이면 해제), `active`
-- `active: false`로 바꾸면 연결된 기기도 폐기합니다.
+- `active: false`로 바꾸면 연결된 기기도 폐기합니다. `active: true`로 다시 활성화할 수 있지만 기기는 다시 페어링해야 합니다.
 
 ```json
 { "defaultDriverId": null, "active": false }
@@ -175,7 +175,7 @@
 #### 요청
 
 - 보낸 필드만 바뀝니다: `dept`, `name`, `active`
-- 비활성 직원은 차량 앱 선택 목록에서 빠지고, 기본 운전자로 지정된 차량은 기본 운전자가 해제됩니다. 과거 트립의 직원 정보는 유지
+- `active: true`로 다시 활성화할 수 있습니다. 비활성 직원은 차량 앱 선택 목록에서 빠지고, 기본 운전자로 지정된 차량은 기본 운전자가 해제됩니다. 과거 트립의 직원 정보는 유지
 
 ```json
 { "active": false }
