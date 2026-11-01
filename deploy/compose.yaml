@@ -26,9 +26,18 @@ services:
       DB_URL: jdbc:postgresql://autolog-db:5432/${DB_NAME:-autolog}
       DB_USERNAME: ${DB_USERNAME:-autolog}
       DB_PASSWORD: ${DB_PASSWORD:?deploy/.env에 DB_PASSWORD를 설정하세요}
-      # 계약 문서의 인증·CORS 구현이 사용할 값입니다. 실제 소비 코드는 앱에서 구현합니다.
+      # 관리자 JWT 서명 키(32바이트 이상)와 대시보드 CORS 출처. 없거나 짧으면 API가 시작하지 않습니다.
       JWT_SECRET: ${JWT_SECRET:?deploy/.env에 JWT_SECRET를 설정하세요}
+      JWT_EXPIRES_HOURS: ${JWT_EXPIRES_HOURS:-12}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      CONSENT_VERSION: ${CONSENT_VERSION:-2026-11-01}
+      # 회사·관리자 시드. 네 값(SEED_ORG_NAME·SEED_BIZ_REG_NO·SEED_ADMIN_LOGIN_ID·SEED_ADMIN_PASSWORD)이
+      # 모두 있을 때만 실행하고, 같은 사업자등록번호가 있으면 아무것도 바꾸지 않습니다.
+      SEED_ORG_NAME: ${SEED_ORG_NAME:-}
+      SEED_BIZ_REG_NO: ${SEED_BIZ_REG_NO:-}
+      SEED_ADMIN_LOGIN_ID: ${SEED_ADMIN_LOGIN_ID:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_ADMIN_DISPLAY_NAME: ${SEED_ADMIN_DISPLAY_NAME:-}
       # JVM heap 외에도 metaspace, thread stack, native memory가 필요하므로 상한의 70%만 사용합니다.
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0 -XX:InitialRAMPercentage=20.0 -XX:+ExitOnOutOfMemoryError -Dfile.encoding=UTF-8}
     expose:
