@@ -44,12 +44,12 @@
 
 | 항목 | 규칙 |
 | --- | --- |
-| Base URL | 운영 `https://autolog-api.aihub.io.kr/api/v1` / 로컬 `http://localhost:8080/api/v1` / 에뮬레이터 `http://10.0.2.2:8080/api/v1` (Pleos AVD에서 동일한지 미확인) |
+| Base URL | 운영 `https://autolog-api.aihub.io.kr/api/v1` / 로컬 `http://localhost:8080/api/v1` / 에뮬레이터 `http://10.0.2.2:8080/api/v1` (Pleos AVD debug → 호스트 `http://10.0.2.2:8080` HTTP 200 연결 **확인됨 2026-11-02**) |
 | 형식 | JSON, UTF-8, 필드명 camelCase |
 | 응답 구조 | 항상 `{ success, data, error }`. 예외: 기록부 XLSX 다운로드 성공 응답은 파일 본문 (실패는 JSON) |
 | 인증 헤더 | `Authorization: Bearer {관리자 JWT 또는 기기 토큰}`. 쿠키를 쓰지 않으므로 CSRF 대상 아님 |
 | 시각 | ISO-8601 + 오프셋 (`2026-11-03T08:12:00+09:00`). 서버 저장은 `timestamptz` |
-| 사용일자 | `tripDate` = `startedAt`의 Asia/Seoul 날짜. 서버가 계산 |
+| 사용일자 | `tripDate` = `startedAt`의 Asia/Seoul 날짜. 서버가 계산. 차량 앱의 용도 추정·사용일자 계산도 기기 시간대와 무관하게 Asia/Seoul을 명시 (구현 기준 2026-11-02) |
 | 거리 | km, 소수 첫째 자리 number. 주행거리는 서버가 계산(주행 후 − 주행 전) |
 | 식별자 | 서버 엔티티는 number id. 트립은 차량 앱이 만든 `clientUuid`(UUID v4)만 외부에 노출 |
 | 기간 | 조회·내보내기 기간 `from`~`to`는 날짜 포함 최대 366일 (`to` ≤ `from` + 365일). 윤년 1년도 허용 |

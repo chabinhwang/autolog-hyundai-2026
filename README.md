@@ -54,7 +54,7 @@ cd app
 ./gradlew :car:testDebugUnitTest
 ```
 
-Android Studio에서 `app/` 폴더를 열어도 됩니다. debug 빌드의 서버 주소는 `http://10.0.2.2:8080`입니다. Pleos AVD에서 호스트 서버에 실제 연결되는지는 미확인입니다 (2026-11-02).
+Android Studio에서 `app/` 폴더를 열어도 됩니다. debug 빌드의 서버 주소는 `http://10.0.2.2:8080`입니다. Pleos AVD → 호스트 로컬 서버 HTTP 200 연결과 외부 HTTPS 통신은 **확인됨 (2026-11-02)**. Foreground Service·WorkManager 실행은 미확인입니다.
 
 ## 테스트 환경·필요한 설정
 
@@ -64,12 +64,14 @@ Android Studio에서 `app/` 폴더를 열어도 됩니다. debug 빌드의 서�
 - **Pleos Connect 전용 AVD** (Emulator 2.1.0, Android 14/API 34). 일반 Android·Automotive 이미지에는 Pleos Vehicle Service가 없어 Vehicle SDK가 동작하지 않습니다.
 - Docker (로컬 PostgreSQL)
 
-Pleos Connect Emulator 설정은 다음과 같이 **확인됨 (2026-11-02)**. 이 PC의 이미지 설치·AVD 생성·Virtual Console 연결은 **진행 중**이며 완료 여부는 아직 미확인입니다.
+Pleos Connect Emulator 설정과 이 PC의 이미지 설치·AVD 생성·Virtual Console 연결 완료는 **확인됨 (2026-11-02)**. 0단계 실측 환경은 Emulator 2.1.0(arm64), AVD 이름 `Pleos_Connect_v2.1`, 기기 프로필 id `Pleos_Connect_v2_0`입니다.
 
 - Apple Silicon(arm64) 이미지가 있습니다. 패키지는 `system-images;android-34;pleos_car_emulator;arm64-v8a`, 다운로드 크기는 약 4.7GB입니다.
 - SDK Update Site: `https://nexus-playground.pleos.ai/repository/raw-releases/connect-avd/2.x/crp-arm64-sys-img.xml`. Android Studio SDK Manager에 등록하거나 `~/.android/repositories.cfg`에 사이트를 등록해 명령줄 `sdkmanager`로 설치할 수 있습니다.
 - AVD는 **Cold boot**, RAM **4GB**로 설정합니다. Quick boot에서는 VHAL을 사용할 수 없습니다.
-- Virtual Console은 `adb forward tcp:8088 tcp:8088` 실행 후 [로컬 웹 페이지](http://127.0.0.1:8088/)에서 엽니다. 실제 기어 값·TTS/STT 동작은 미확인입니다.
+- Virtual Console은 `adb forward tcp:8088 tcp:8088` 실행 후 [로컬 웹 페이지](http://127.0.0.1:8088/)를 브라우저에서 한 번 열어야 활성화됩니다. 열기 전 HTTP 쓰기는 `{"error":"emulator_inactive"}`입니다. 활성화 후 `PUT /vehicle/gear?gear=Drive`(`Park` / `Reverse` / `Neutral`도 가능), `PUT /vehicle/odometer?traveled_distance_km=12.4`로 제어할 수 있습니다. Odometer 소수 입력이 가능하며 화면 슬라이더만 1km 단위입니다 (**확인됨 2026-11-02**).
+- 기어 P/D·Odometer km 값·알림, FusedLocation 위치 수신, TTS ON_DEVICE 재생, STT ON_DEVICE의 `sendAudio` PCM 한국어 인식은 **확인됨 (2026-11-02)**. 호스트 마이크 경로·macOS 마이크 권한은 미확인입니다. TTS 3.3.1 리스너는 `initialize` 성공 콜백 이후 등록하고, STT는 EPD별 `completed=true` 조각을 모아 해석합니다.
+- 에뮬레이터 시간대는 환경에 따라 `America/Los_Angeles`일 수 있습니다 (**확인됨 2026-11-02**). 앱의 용도 추정·사용일자 계산은 `Asia/Seoul`을 명시해야 합니다. 용도 추정은 `18fdac4`의 `PurposeEstimator` 코드에서 명시된 것을 **확인됨 (2026-11-02)**. 차량 앱 사용일자 계산 반영은 예정입니다.
 
 공식 안내: [Pleos Connect Emulator 설치 및 실행](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator). Vehicle SDK 2.3.2의 기어 API·권한과 TTS/STT SDK 3.3.1 생성자·모드·권한은 [아키텍처의 SDK 확인 사항](docs/contracts/architecture.md#5-sdk-확인-사항)에 정리했습니다.
 
