@@ -18,6 +18,8 @@ LABEL org.opencontainers.image.source="https://github.com/chabinhwang/autolog-hy
       org.opencontainers.image.revision="$VCS_REF" \
       org.opencontainers.image.title="AutoLog API"
 WORKDIR /app
+# 한글 환경변수(SEED_ORG_NAME 등)가 깨지지 않도록 UTF-8 로캘로 실행합니다.
+ENV LANG=C.UTF-8
 
 # healthcheck용 curl과 non-root 사용자를 준비합니다. DB 비밀번호 등은 이미지에 복사하지 않습니다.
 RUN apt-get update \

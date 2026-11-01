@@ -1,15 +1,22 @@
 package com.autolog.server;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class ServerApplicationTests {
+import com.autolog.server.support.IntegrationTest;
+import org.junit.jupiter.api.Test;
+
+class ServerApplicationTests extends IntegrationTest {
 
 	@Test
-	void contextLoads() {
+	void contextLoadsWithFlywaySchemaValidatedByJpa() {
 	}
 
+	@Test
+	void healthIsPublic() throws Exception {
+		mockMvc.perform(get("/actuator/health"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("UP"));
+	}
 }

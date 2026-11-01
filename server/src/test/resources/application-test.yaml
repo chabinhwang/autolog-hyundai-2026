@@ -1,5 +1,13 @@
-spring:
-  datasource:
-    url: jdbc:h2:mem:autolog;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
-    username: sa
-    password: ""
+# 자동 테스트용. DB는 Testcontainers PostgreSQL(@ServiceConnection)이 연결합니다.
+autolog:
+  jwt:
+    secret: test-only-jwt-secret-must-be-at-least-32-bytes
+  cors:
+    allowed-origins: http://localhost:5173,https://dashboard.example.test
+  consent-version: 2026-11-01
+  seed:
+    org-name: 시드 주식회사
+    biz-reg-no: 999-99-99999
+    admin-login-id: seed-admin@autolog-test.kr
+    admin-password: seed-password-1234
+    admin-display-name: 시드관리자

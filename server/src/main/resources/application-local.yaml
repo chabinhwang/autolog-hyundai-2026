@@ -1,7 +1,20 @@
 # 로컬 개발용: compose.yaml의 PostgreSQL에 연결합니다.
 # 실행: ./gradlew bootRun --args='--spring.profiles.active=local'
+# 아래 값은 로컬 개발 전용입니다. 운영 비밀값을 여기에 넣지 마세요.
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/autolog
     username: autolog
     password: autolog
+
+autolog:
+  jwt:
+    secret: ${JWT_SECRET:local-development-only-jwt-secret-0123456789}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  seed:
+    org-name: ${SEED_ORG_NAME:오토로그 주식회사}
+    biz-reg-no: ${SEED_BIZ_REG_NO:123-45-67890}
+    admin-login-id: ${SEED_ADMIN_LOGIN_ID:admin@autolog-demo.kr}
+    admin-password: ${SEED_ADMIN_PASSWORD:autolog-local-1234}
+    admin-display-name: ${SEED_ADMIN_DISPLAY_NAME:총무팀}
