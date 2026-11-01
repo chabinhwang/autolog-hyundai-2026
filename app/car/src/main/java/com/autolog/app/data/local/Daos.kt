@@ -71,6 +71,13 @@ interface TripDao {
     @Query("UPDATE trip SET driverId = NULL, syncState = 'PENDING', syncErrorCode = NULL WHERE clientUuid = :uuid")
     suspend fun clearDriverForRetry(uuid: String)
 
+    /** 이전에 직원 없음으로 실패 처리된 트립(이 처리 도입 전 기록 포함)도 이용자 없이 다시 보낸다. */
+    @Query(
+        """UPDATE trip SET driverId = NULL, syncState = 'PENDING', syncErrorCode = NULL
+           WHERE syncState = 'FAILED' AND syncErrorCode = 'DRIVER_NOT_FOUND'""",
+    )
+    suspend fun requeueDriverNotFound(): Int
+
     @Query("SELECT COUNT(*) FROM trip WHERE syncState = 'FAILED'")
     fun observeFailedCount(): Flow<Int>
 

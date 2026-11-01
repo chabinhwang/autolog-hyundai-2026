@@ -11,6 +11,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -219,6 +220,24 @@ class SyncEngineTest {
         assertTrue(server.takeRequest().body.readUtf8().contains("\"driverId\":null"))
         assertEquals(SyncState.SYNCED, trips.find("a")!!.syncState)
         assertNull(trips.find("a")!!.driverId)
+    }
+
+    @Test
+    fun `이전에 직원 없음으로 실패한 트립도 이용자 없이 다시 보낸다`() = runBlocking {
+        trips.insert(Fixtures.trip("a"))
+        trips.markFailed("a", "DRIVER_NOT_FOUND")
+        trips.insert(Fixtures.trip("b", Instant.parse("2026-11-02T23:30:00Z")))
+        trips.markFailed("b", "VALIDATION_FAILED")
+        server.enqueue(uploadResults(Triple("a", "CREATED", null)))
+        server.enqueue(json(200, configBody))
+
+        assertEquals(SyncEngine.Outcome.SUCCESS, engine().run())
+
+        val body = server.takeRequest().body.readUtf8()
+        assertTrue(body.contains("\"driverId\":null"))
+        assertFalse(body.contains("\"clientUuid\":\"b\""))
+        assertEquals(SyncState.SYNCED, trips.find("a")!!.syncState)
+        assertEquals(SyncState.FAILED, trips.find("b")!!.syncState)
     }
 
     @Test

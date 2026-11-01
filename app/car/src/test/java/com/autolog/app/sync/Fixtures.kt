@@ -98,6 +98,12 @@ class FakeTripDao : TripDao {
         put(t.copy(driverId = null, syncState = SyncState.PENDING, syncErrorCode = null))
     }
 
+    override suspend fun requeueDriverNotFound(): Int {
+        val targets = rows.value.values.filter { it.syncState == SyncState.FAILED && it.syncErrorCode == "DRIVER_NOT_FOUND" }
+        targets.forEach { put(it.copy(driverId = null, syncState = SyncState.PENDING, syncErrorCode = null)) }
+        return targets.size
+    }
+
     override fun observeFailedCount(): Flow<Int> = rows.map { it.values.count { t -> t.syncState == SyncState.FAILED } }
 
     override suspend fun releaseStaleAnswers() {

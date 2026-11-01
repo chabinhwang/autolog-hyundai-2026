@@ -93,6 +93,7 @@ class SyncEngine(
     }
 
     private suspend fun uploadTrips() {
+        tripDao.requeueDriverNotFound()
         while (true) {
             val batch = tripDao.pendingUploads(BATCH_SIZE)
             if (batch.isEmpty()) return
