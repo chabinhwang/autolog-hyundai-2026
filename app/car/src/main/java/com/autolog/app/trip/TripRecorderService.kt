@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.util.Log
+import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.autolog.app.AutologApp
 import com.autolog.app.BuildConfig
@@ -87,12 +88,13 @@ class TripRecorderService : Service() {
 
     private fun startAsForeground(text: String) {
         val withMic = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        // ServiceCompat은 기기 API에서 지원하지 않는 유형 값을 빼고 호출한다(minSdk 28).
         try {
-            startForeground(NOTIFICATION_ID, notification(text), withMic)
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(text), withMic)
         } catch (e: SecurityException) {
             // 백그라운드(부팅 직후 등)에서 시작되면 microphone 유형은 거부된다.
             Log.w(TAG, "microphone 유형 없이 시작: ${e.message}")
-            startForeground(NOTIFICATION_ID, notification(text), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(text), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         }
     }
 

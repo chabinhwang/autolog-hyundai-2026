@@ -57,7 +57,9 @@ class MainActivity : ComponentActivity() {
 
     /** 위치(Pleos FusedLocation)·마이크(도착 확인 응답)·알림(기록 상태). */
     private fun requestMissingPermissions() {
-        val needed = listOf(FUSED_LOCATION, Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)
+        val wanted = listOf(FUSED_LOCATION, Manifest.permission.RECORD_AUDIO) +
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList()
+        val needed = wanted
             .filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (needed.isNotEmpty()) permissionLauncher.launch(needed.toTypedArray())
     }

@@ -2,6 +2,8 @@ package com.autolog.app.ui
 
 import android.app.Application
 import android.content.ContentValues
+import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.YearMonth
 
 /** 차량 앱 화면 상태. 화면은 정차 중에만 쓴다(DO 미선언 앱은 주행 중 플랫폼이 화면을 막는다). */
@@ -156,15 +159,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val name = "autolog_${vehicle.value?.regNo ?: "vehicle"}_$month.csv"
             _message.value = withContext(Dispatchers.IO) {
                 runCatching {
-                    val resolver = getApplication<Application>().contentResolver
-                    val values = ContentValues().apply {
-                        put(MediaStore.Downloads.DISPLAY_NAME, name)
-                        put(MediaStore.Downloads.MIME_TYPE, "text/csv")
-                    }
-                    val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: error("저장 위치를 만들 수 없음")
                     // 엑셀이 한글을 깨뜨리지 않도록 UTF-8 BOM을 붙인다.
-                    resolver.openOutputStream(uri)!!.use { it.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + csv.toByteArray()) }
-                    "다운로드 폴더에 $name 파일로 저장했어요. (${trips.size}건)"
+                    val bytes = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + csv.toByteArray()
+                    val location = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val resolver = getApplication<Application>().contentResolver
+                        val values = ContentValues().apply {
+                            put(MediaStore.Downloads.DISPLAY_NAME, name)
+                            put(MediaStore.Downloads.MIME_TYPE, "text/csv")
+                        }
+                        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: error("저장 위치를 만들 수 없음")
+                        resolver.openOutputStream(uri)!!.use { it.write(bytes) }
+                        "다운로드 폴더"
+                    } else {
+                        // API 28은 MediaStore.Downloads가 없어 앱 전용 다운로드 폴더에 저장한다.
+                        val dir = getApplication<Application>().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: error("저장 위치 없음")
+                        File(dir, name).writeBytes(bytes)
+                        dir.absolutePath
+                    }
+                    "${location}에 $name 파일로 저장했어요. (${trips.size}건)"
                 }.getOrElse { "CSV 저장에 실패했어요: ${it.message}" }
             }
         }
@@ -173,7 +185,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         if (voiceLazy.isInitialized()) voice.release()
         if (locationLazy.isInitialized()) location.release()
-        super.onCleared()
     }
 
     private companion object {
