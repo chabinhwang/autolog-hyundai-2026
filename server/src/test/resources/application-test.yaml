@@ -1,4 +1,10 @@
 # 자동 테스트용. DB는 Testcontainers PostgreSQL(@ServiceConnection)이 연결합니다.
+# AUTOLOG_TEST_DB_URL이 있으면 컨테이너 대신 그 DB를 씁니다 (Docker 없는 로컬: .local/test-postgres.sh test).
+spring:
+  datasource:
+    url: ${AUTOLOG_TEST_DB_URL:}
+    username: ${AUTOLOG_TEST_DB_USERNAME:}
+    password: ${AUTOLOG_TEST_DB_PASSWORD:}
 autolog:
   jwt:
     secret: test-only-jwt-secret-must-be-at-least-32-bytes
