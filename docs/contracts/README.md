@@ -11,7 +11,7 @@
 | 문서 | 내용 |
 | --- | --- |
 | [architecture.md](architecture.md) | 전체 구조, 데이터 흐름, 구성 요소별 내부 구조, 설계 원칙, SDK 확인 사항·미확인 전제 |
-| [car-app.md](car-app.md) | 차량 앱 2~6단계 실제 구현: 기록·복구·수정·동기화·음성·권한·CSV, 실측 결과·남은 항목 |
+| [car-app.md](car-app.md) | 차량 앱 실제 구현·후속 연동: 기록·복구·수정·동기화·음성·권한·CSV, 실측 결과·STT 리스크·남은 항목 |
 | [database.md](database.md) | 열거값, 테이블 정의 (PostgreSQL, Flyway) |
 | [rules.md](rules.md) | 인증·페어링, 동기화·수정, 마스킹, 대시보드 집계, 기록부 내보내기, 개인정보 보유·동의 |
 | [config.md](config.md) | 서버 환경변수, 회사·관리자 시드 |

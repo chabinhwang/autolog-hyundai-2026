@@ -53,13 +53,18 @@ cd app
 ./gradlew :car:installDebug         # 실행 중인 Pleos Connect AVD에 설치
 ```
 
-Android Studio에서 `app/` 폴더를 열어도 됩니다. Android SDK 경로는 `app/local.properties`의 `sdk.dir` (이 PC는 `~/Library/Android/sdk`) 또는 `ANDROID_HOME`으로 지정합니다. debug APK는 `app/car/build/outputs/apk/debug/`에 생성됩니다. 차량 앱 단위 테스트 65개 **확인됨 (2026-11-02)**.
+Android Studio에서 `app/` 폴더를 열어도 됩니다. Android SDK 경로는 `app/local.properties`의 `sdk.dir` (이 PC는 `~/Library/Android/sdk`) 또는 `ANDROID_HOME`으로 지정합니다. debug APK는 `app/car/build/outputs/apk/debug/`에 생성됩니다. 차량 앱 단위 테스트 77개·lint 오류 0 **확인됨 (2026-11-02)**.
 
 - release는 API 호스트 `https://autolog-api.aihub.io.kr`, P 유지 종료 확정 180초입니다. debug는 `http://10.0.2.2:8080`, 30초입니다.
-- debug 전용 `ProbeActivity`와 `filesDir/voice_answer.pcm`(16kHz·16bit·mono)을 마이크 대신 한 번 주입하는 검증 기능이 있습니다. PCM 주입과 호스트 마이크 검증은 구분합니다.
+- debug 전용 `ProbeActivity`와 `filesDir/voice_answer.pcm`(16kHz·16bit·mono)을 마이크 대신 주입하는 검증 기능이 있습니다. 파일은 한 번 읽어 지우고 STT 오류 재질문에는 캐시한 같은 PCM을 한 번 더 사용합니다. PCM 주입과 호스트 마이크 검증은 구분합니다.
 - Pleos AVD에서 화면 시작 Foreground Service(`specialUse|microphone`, `types=0x40000080`)와 트립 저장·화면 수정 직후 WorkManager 로컬 서버 업로드는 **확인됨 (2026-11-02)**. 부팅 직후는 `specialUse`만 실행하며 이 경로의 STT 마이크 사용 가능 여부는 **미확인**입니다.
 - 페어링 → 동의·집 등록 → 12.4km 업무 운행 음성 확인 → 서버·대시보드 표시, 무응답 마스킹 → 차량 화면 개인 수정 → 서버 수정 이력, 이번 달 CSV 저장까지 **확인됨 (2026-11-02)**.
+- 주행 시작에도 동기화합니다. 직전 추가한 거래처 '그린물류' 6.8km 인식·업무 저장, 관리자 미확인 운행 확정의 `tripUpdates` 수신·차량 목록 반영, 비활성 직원 선택 해제·이용자 없는 업로드와 과거 `FAILED(DRIVER_NOT_FOUND)` 재전송, 상단 빨간 '전송 실패 N건' 표시는 **확인됨 (2026-11-02)**.
 - CSV는 14개 열의 UTF-8 BOM 파일이며 수식처럼 보이는 문자열 앞에 `'`를 붙입니다. API 29 이상은 다운로드 폴더, API 28은 앱 전용 다운로드 폴더에 저장합니다.
+
+시연 음성은 "네, 맞아요"·"개인 용무였어요"처럼 긴 응답을 권장합니다. Pleos 온디바이스 STT가 짧은 "응"·"업무" 끝에서 엔진 오류나 음성 서비스 크래시로 응답을 잃는 현상은 **확인됨 (2026-11-02, 이번 실측 약 8회 중 2회)**입니다. 응답 조각 없이 오류 콜백이 오면 한 번만 다시 묻고, 콜백 없는 크래시·무응답은 미확인으로 남깁니다. 재질문 경로는 단위 테스트로 검증했으며 에뮬레이터 실측은 아직 **미확인**입니다. 응답 전체가 '너무'인 경우의 업무 보정은 [계약 §3](docs/contracts/car-app.md#3-음성용도-추정주행-제한)을 따릅니다.
+
+출근·퇴근 시연은 평일 06:00~10:59·16:00~22:59 KST에 추정됩니다. 다른 PT 시간대에는 에뮬레이터 시각 조정이 필요할 수 있으며, 서버는 10분 넘는 미래 시각을 거절하므로 과거 시각을 사용하고 끝나면 자동 시각을 복구합니다. release APK 파일명·서명키는 미해결입니다.
 
 실제 패키지·저장·동기화·음성·권한·CSV 열·남은 구현은 [차량 앱 구현 계약](docs/contracts/car-app.md)에 정리했습니다. 화면은 DO 미선언으로 정차 중에만 사용하며 주행 중 차단은 플랫폼이 담당합니다. 도착 확인은 음성으로 처리하고 실패하면 미확인으로 남겨 정차 중 3버튼으로 정리합니다.
 

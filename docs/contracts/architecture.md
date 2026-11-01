@@ -83,10 +83,14 @@
 ### ③ 기준정보 내려받기 (관리자 → 차량) — [rules §5](rules.md#5-설정-내려받기-get-devicesmeconfig)
 
 ```text
-관리자가 거래처 추가 → updated_at 갱신
-차량 앱: GET /devices/me/config?since=… → 바뀐 장소·직원만 수신
+관리자가 거래처 추가·직원 비활성·미확인 운행 확정
+차량 앱: 앱 시작·주행 시작·저장/수정·주기 동기화에서 GET /devices/me/config?since=…
+→ 바뀐 장소·직원 및 관리자 수정 tripUpdates 수신
+→ 비활성 선택 이용자 해제·로컬 운행 용도 갱신
 → 다음 도착 때 "○○ 방문, 업무로 기록할까요?"
 ```
+
+주행 직전 추가한 '그린물류' 6.8km 인식·업무 저장, 관리자 확정 후 차량 확인 목록에서 제외, 비활성 이용자 없는 업로드·과거 `DRIVER_NOT_FOUND` 실패 건 복구는 **확인됨 (2026-11-02)**. 재전송 대상 밖의 실패는 상단 빨간 '전송 실패 N건'으로 표시합니다.
 
 ### ④ 조회·내보내기 (관리자) — [rules §7~9](rules.md#7-마스킹-관리자에게-보이는-값)
 
@@ -113,7 +117,7 @@ com.autolog.app
 ├── pairing/   PairingController, DeviceTokens, KeystoreCipher
 ├── vehicle/   VehicleSource ← PleosVehicleSource
 ├── location/  LocationSource ← PleosLocationSource
-├── voice/     VoiceIO ← PleosVoiceIO, SegmentCollector
+├── voice/     VoiceIO·ListenResult ← PleosVoiceIO, SegmentCollector
 ├── export/    CsvExporter
 └── ui/        Compose (정차 중 화면)
 ```
@@ -214,5 +218,8 @@ src/
 | --- | --- | --- |
 | 부팅 직후 specialUse만 실행한 서비스의 STT 마이크 사용 (미확인) | 도착 질문 음성 입력 | 실패 시 미확인으로 보존, 정차 중 화면 3버튼으로 처리 |
 | 에뮬레이터 호스트 마이크 입력·macOS 마이크 권한 (미확인) | `voice/` 입력 경로 | 이 PC 권한·에뮬레이터 마이크 경로 확인. sendAudio PCM 인식은 확인됨 |
+| STT 엔진 오류 콜백 후 한 번 재질문의 에뮬레이터 실측 (미확인) | 음성 오류 복구 | 단위 테스트는 검증됨. 콜백 없는 크래시는 무응답·미확인으로 처리 |
+
+짧은 응답의 온디바이스 STT 엔진 오류·네이티브 크래시·오인식은 **확인됨 (2026-11-02)**. 이번 실측 약 8회 중 2회 응답 유실이며, 시연은 "네, 맞아요"·"개인 용무였어요" 권장. 응답 전체 '너무' 보정·재질문 범위는 [car-app §3](car-app.md#3-음성용도-추정주행-제한)을 따릅니다.
 
 모두 차량 앱 내부 구현에만 영향이 있고, 서버·대시보드 구조와 API 계약은 바뀌지 않습니다.

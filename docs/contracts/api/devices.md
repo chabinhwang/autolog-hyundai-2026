@@ -170,7 +170,7 @@
 ### 요청
 
 - Header: `Authorization: Bearer {기기 토큰 원문}`
-- Query: `since` (선택, ISO-8601). 없으면 전체, 있으면 그 이후 바뀐 직원·장소만. 이전 응답의 `serverTime`을 그대로 사용
+- Query: `since` (선택, ISO-8601). 없으면 기준정보 전체·최근 90일 관리자 수정 트립, 있으면 그 이후 바뀐 직원·장소·관리자 수정 트립(`tripUpdates`). 이전 응답의 `serverTime`을 그대로 사용
 - 예: `GET /api/v1/devices/me/config?since=2026-11-03T08:14:06%2B09:00`
 
 ### 성공 응답 — 200 OK
