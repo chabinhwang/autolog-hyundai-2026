@@ -24,7 +24,7 @@ describe('로그인', () => {
       { token: null },
     )
 
-    expect(await screen.findByRole('heading', { name: 'AutoLog 관리자' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '관리자 로그인' })).toBeTruthy()
     expect(window.location.pathname).toBe('/login')
 
     fillLogin('admin@autolog-demo.kr', 'secret-password')

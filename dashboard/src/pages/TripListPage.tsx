@@ -169,10 +169,8 @@ export function TripListPage() {
               <caption className="sr-only">운행 기록 목록 (시작 시각 내림차순)</caption>
               <thead>
                 <tr>
-                  <th scope="col">사용일자</th>
-                  <th scope="col">시간</th>
-                  <th scope="col">차량</th>
-                  <th scope="col">직원</th>
+                  <th scope="col">사용일자 · 시간</th>
+                  <th scope="col">차량 · 직원</th>
                   <th scope="col">출발 → 도착</th>
                   <th scope="col" className="num">주행 전</th>
                   <th scope="col" className="num">주행 후</th>
@@ -189,11 +187,15 @@ export function TripListPage() {
                   const time = describeTimeRange(trip.startedAt, trip.endedAt)
                   return (
                     <tr key={trip.clientUuid} data-testid={`trip-row-${trip.clientUuid}`}>
-                      <td>{formatTripDate(trip.tripDate)}</td>
-                      <td>{time ?? <span className="muted">{trip.masked ? '비공개' : '-'}</span>}</td>
-                      <td>{trip.vehicle.regNo}</td>
-                      <td>{describeDriver(trip.driver)}</td>
                       <td>
+                        <div className="strong">{formatTripDate(trip.tripDate)}</div>
+                        <div className="cell-sub">{time ?? <span className="muted">{trip.masked ? '비공개' : '-'}</span>}</div>
+                      </td>
+                      <td>
+                        <div>{trip.vehicle.regNo}</div>
+                        <div className="cell-sub muted">{describeDriver(trip.driver)}</div>
+                      </td>
+                      <td className="wrap">
                         <span className={trip.masked && !trip.origin?.label ? 'muted' : undefined}>
                           {describePlace(trip.origin, trip.masked)}
                         </span>

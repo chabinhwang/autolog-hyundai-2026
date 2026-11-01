@@ -100,7 +100,11 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
             <dt>도착</dt>
             <dd>{describePlace(detail.dest, detail.masked)}</dd>
             <dt>용도</dt>
-            <dd>{describePurpose(detail.purpose, detail.businessCategory)}</dd>
+            <dd>
+              <span className={`purpose purpose--${detail.purpose.toLowerCase()}`}>
+                {describePurpose(detail.purpose, detail.businessCategory)}
+              </span>
+            </dd>
             <dt>판정 출처</dt>
             <dd>{labelOf(PURPOSE_SOURCE_LABEL, detail.purposeSource)}</dd>
             <dt>메모</dt>
@@ -158,7 +162,7 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
                       {labelOf(ACTOR_TYPE_LABEL, edit.actorType)}
                       {edit.actorName && <div className="muted small">{edit.actorName}</div>}
                     </td>
-                    <td>
+                    <td className="wrap">
                       <ul className="changes">
                         {edit.changes.map((change) => (
                           <li key={change.field}>
@@ -169,7 +173,7 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
                         ))}
                       </ul>
                     </td>
-                    <td>{edit.reason ?? '-'}</td>
+                    <td className="wrap">{edit.reason ?? '-'}</td>
                     <td>{formatDateTime(edit.editedAt)}</td>
                     <td>{formatDateTime(edit.receivedAt)}</td>
                   </tr>

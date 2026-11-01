@@ -1,4 +1,7 @@
 import { fetchSummary } from '../api/dashboard'
+import type { DashboardSummary } from '../api/types'
+import { DistanceBar } from '../components/DistanceBar'
+import { Icon } from '../components/Icon'
 import { LoadingState } from '../components/LoadingState'
 import { WarningBadges } from '../components/WarningBadges'
 import { useApiData } from '../hooks/useApiData'
@@ -25,7 +28,10 @@ export function HomePage() {
   return (
     <section aria-labelledby="home-title">
       <div className="page-header">
-        <h1 id="home-title">월간 업무사용비율</h1>
+        <div>
+          <h1 id="home-title">월간 업무사용비율</h1>
+          <p className="page-header__desc">차량별 주행거리와 업무사용비율, 확인이 필요한 경고를 한눈에 봅니다.</p>
+        </div>
         <div className="field field--inline">
           <label htmlFor="summary-month">조회 월</label>
           <input
@@ -39,16 +45,18 @@ export function HomePage() {
         </div>
       </div>
 
-      <p className="muted">
-        업무사용비율 = (출퇴근 + 업무) ÷ 총주행거리. 최대 비율은 미확인 운행이 모두 업무일 때의 비율입니다.
-      </p>
-
       <LoadingState loading={loading && !summary} error={error} onRetry={reload} />
 
       {summary && summary.vehicles.length === 0 && <p className="empty">활성 차량이 없습니다. 차량 메뉴에서 차량을 추가해 주세요.</p>}
 
+      {summary && summary.vehicles.length > 0 && <SummaryCards summary={summary} />}
+
       {summary && summary.vehicles.length > 0 && (
         <div className="table-wrap">
+          <div className="table-wrap__head">
+            <h2>차량별 집계</h2>
+            <span className="muted small">단위 km · 업무사용비율 = (출퇴근 + 업무) ÷ 총주행거리</span>
+          </div>
           <table className="table" aria-describedby="home-title">
             <caption className="sr-only">{summary.month} 차량별 운행 집계 (단위 km)</caption>
             <thead>
@@ -90,9 +98,24 @@ export function HomePage() {
                       </div>
                     )}
                   </td>
-                  <td className="num strong">{formatRatio(vehicle.businessRatio)}</td>
+                  <td className="num">
+                    <span className="ratio">{formatRatio(vehicle.businessRatio)}</span>
+                    {vehicle.totalKm > 0 && <DistanceBar parts={vehicle} />}
+                  </td>
                   <td className="num">{formatRatio(vehicle.maxBusinessRatio)}</td>
-                  <td>{vehicle.paired ? formatDateTime(vehicle.lastSyncedAt) : <span className="muted">미연결</span>}</td>
+                  <td>
+                    {vehicle.paired ? (
+                      <span className="sync">
+                        <span className="dot dot--ok" aria-hidden="true" />
+                        {formatDateTime(vehicle.lastSyncedAt)}
+                      </span>
+                    ) : (
+                      <span className="sync muted">
+                        <span className="dot dot--off" aria-hidden="true" />
+                        미연결
+                      </span>
+                    )}
+                  </td>
                   <td>
                     <WarningBadges warnings={vehicle.warnings} />
                   </td>
@@ -122,7 +145,7 @@ export function HomePage() {
         </div>
       )}
 
-      <details className="legend">
+      <details className="legend card">
         <summary>경고 설명</summary>
         <dl>
           {Object.entries(WARNING_LABEL).map(([code, info]) => (
@@ -134,5 +157,67 @@ export function HomePage() {
         </dl>
       </details>
     </section>
+  )
+}
+
+function ratioOf(part: number, total: number): number | null {
+  return total > 0 ? Math.round((part / total) * 1000) / 10 : null
+}
+
+/** 홈 상단 요약 카드: 총주행, 업무사용비율, 미확인, 경고 차량 */
+function SummaryCards({ summary }: { summary: DashboardSummary }) {
+  const { totals } = summary
+  const ratio = totals.businessRatio
+  const maxRatio = ratioOf(totals.commuteKm + totals.businessKm + totals.unconfirmedKm, totals.totalKm)
+  const warned = summary.vehicles.filter((vehicle) => vehicle.warnings.length > 0).length
+  const trips = summary.vehicles.reduce((sum, vehicle) => sum + vehicle.tripCount, 0)
+  return (
+    <div className="kpis" aria-label="이번 달 요약">
+      <div className="kpi kpi--primary">
+        <div className="kpi__label">
+          <Icon name="gauge" size={18} />
+          업무사용비율
+        </div>
+        <div className="kpi__value">{formatRatio(ratio)}</div>
+        <div className="meter" aria-hidden="true">
+          <span className="meter__fill" style={{ width: `${Math.min(ratio ?? 0, 100)}%` }} />
+          {maxRatio !== null && <span className="meter__max" style={{ left: `${Math.min(maxRatio, 100)}%` }} />}
+        </div>
+        <div className="kpi__sub">미확인이 모두 업무라면 최대 {formatRatio(maxRatio)}</div>
+      </div>
+      <div className="kpi">
+        <div className="kpi__label">
+          <Icon name="route" size={18} />
+          총주행거리
+        </div>
+        <div className="kpi__value">
+          {formatKm(totals.totalKm)}
+          <span className="kpi__unit">km</span>
+        </div>
+        <DistanceBar parts={totals} showLegend />
+      </div>
+      <div className={totals.unconfirmedCount > 0 ? 'kpi kpi--attention' : 'kpi'}>
+        <div className="kpi__label">
+          <Icon name="question" size={18} />
+          미확인 운행
+        </div>
+        <div className="kpi__value">
+          {totals.unconfirmedCount}
+          <span className="kpi__unit">건</span>
+        </div>
+        <div className="kpi__sub">전체 {trips}건 중 · {formatKm(totals.unconfirmedKm)} km</div>
+      </div>
+      <div className={warned > 0 ? 'kpi kpi--attention' : 'kpi'}>
+        <div className="kpi__label">
+          <Icon name="alert" size={18} />
+          경고 차량
+        </div>
+        <div className="kpi__value">
+          {warned}
+          <span className="kpi__unit">/ {summary.vehicles.length}대</span>
+        </div>
+        <div className="kpi__sub">{warned > 0 ? '표의 경고 항목을 확인해 주세요' : '확인할 경고가 없습니다'}</div>
+      </div>
+    </div>
   )
 }
