@@ -85,6 +85,6 @@ Android Studio에서 `app/` 폴더를 열어도 됩니다. debug 빌드는 에�
 
 [`docs/contracts/`](docs/contracts/README.md)에 서버·차량 앱·대시보드가 함께 지키는 API·DB·동작 규칙을 둡니다. 구현은 이 문서를 기준으로 하고, 바꿀 때는 문서부터 고칩니다.
 
-## 개발 문서 (로컬 전용)
+## Pleos 개발 문서
 
-`docs/`의 나머지에는 Pleos SDK·Gleo 앱 연동·디자인 시스템 문서를 Markdown으로 보관합니다. 용량 문제로 저장소에는 포함하지 않으며(`.gitignore`), 로컬에서는 `docs/README.md` 목차에서 필요한 문서만 골라 읽습니다.
+Pleos SDK·앱 개발 문서는 저장소에 포함하지 않습니다. 개발할 때는 [Pleos 공식 개발자 문서](https://document.pleos.ai/docs/pleos-only/getting-started)를 참고합니다.

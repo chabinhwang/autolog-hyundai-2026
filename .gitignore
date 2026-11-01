@@ -15,6 +15,9 @@
 .env
 .env.*
 
-# Local documentation (Pleos 보관 문서는 제외, 계약 문서만 포함)
+# 이 PC 전용 SSH 설정·서버 접속 정보·운영 메모 (GitHub에 올리지 않음)
+/.local/
+
+# docs/는 계약 문서만 포함 (docs/product 기획은 로컬 전용, Pleos 문서 보관본은 .local/pleos-docs)
 /docs/*
 !/docs/contracts/
