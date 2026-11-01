@@ -9,6 +9,7 @@ import com.autolog.app.data.local.TripEntity
 import com.autolog.app.domain.BusinessCategory
 import com.autolog.app.domain.DetectedTrip
 import com.autolog.app.domain.Endpoint
+import com.autolog.app.domain.EndpointType
 import com.autolog.app.domain.GeoPoint
 import com.autolog.app.domain.Place
 import com.autolog.app.domain.Purpose
@@ -102,7 +103,13 @@ class TripRepository(
     suspend fun changePurpose(uuid: String, purpose: Purpose, category: BusinessCategory?, source: PurposeSource = PurposeSource.MANUAL) {
         require(purpose != Purpose.UNCONFIRMED) { "미확인으로는 바꿀 수 없습니다." }
         val trip = tripDao.find(uuid) ?: return
-        val normalizedCategory = if (purpose == Purpose.BUSINESS) category else null
+        // 세부를 고르지 않은 업무는 도착지가 거래처면 방문으로 둔다(음성 "응"과 같은 결과, car-app.md §3).
+        val normalizedCategory = when {
+            purpose != Purpose.BUSINESS -> null
+            category != null -> category
+            trip.destType == EndpointType.CLIENT -> BusinessCategory.VISIT
+            else -> null
+        }
         tripDao.updatePurpose(uuid, purpose, source, normalizedCategory)
         if (trip.syncState == SyncState.SYNCED) {
             editDao.insert(
