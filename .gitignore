@@ -14,3 +14,7 @@
 # secrets
 .env
 .env.*
+
+# Local documentation (Pleos 보관 문서는 제외, 계약 문서만 포함)
+/docs/*
+!/docs/contracts/
