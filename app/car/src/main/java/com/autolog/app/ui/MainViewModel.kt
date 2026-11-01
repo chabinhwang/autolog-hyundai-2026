@@ -20,7 +20,6 @@ import com.autolog.app.pairing.PairingController
 import com.autolog.app.purpose.PurposeEstimator
 import com.autolog.app.sync.SyncWorker
 import com.autolog.app.trip.TripRecorderService
-import com.autolog.app.voice.PleosVoiceIO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,8 +38,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val container = (app as AutologApp).container
     private val db = container.database
     private val settings = container.settings
-    private val voiceLazy = lazy { PleosVoiceIO(app) }
-    private val voice by voiceLazy
     private val locationLazy = lazy { PleosLocationSource(app) }
     private val location by locationLazy
 
@@ -95,7 +92,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun afterPaired() {
         container.syncEngine.run()
         TripRecorderService.start(getApplication())
-        voice.speak("차량 등록이 완료됐어요.")
+        container.voice.speak("차량 등록이 완료됐어요.")
     }
 
     fun selectDriver(driver: DriverEntity?) {
@@ -184,7 +181,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
-        if (voiceLazy.isInitialized()) voice.release()
         if (locationLazy.isInitialized()) location.release()
     }
 

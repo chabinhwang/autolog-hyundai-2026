@@ -8,6 +8,8 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
@@ -49,6 +51,8 @@ interface VoiceIO {
  *
  * @param debugAudio debug 빌드에서 마이크 대신 넣을 PCM(16kHz·16bit·mono)을 돌려준다. 자동 시연·테스트용.
  *   STT 오류로 끝나면 다시 물을 때 같은 PCM을 한 번 더 넣는다.
+ *
+ * 앱 전체에서 하나만 쓴다(AppContainer.voice). 화면과 기록 서비스가 함께 쓰므로 말하기·듣기를 한 번에 하나씩 처리한다.
  */
 class PleosVoiceIO(
     private val context: Context,
@@ -57,6 +61,7 @@ class PleosVoiceIO(
     private var tts: TextToSpeech? = null
     private var stt: SpeechToText? = null
     private var retryDebugPcm: ByteArray? = null
+    private val busy = Mutex()
 
     private suspend fun ttsReady(): TextToSpeech? = tts ?: withContext(Dispatchers.Main) {
         val created = TextToSpeech(context.applicationContext, TtsMode.ON_DEVICE)
@@ -80,7 +85,9 @@ class PleosVoiceIO(
         }
     }
 
-    override suspend fun speak(text: String): Boolean {
+    override suspend fun speak(text: String): Boolean = busy.withLock { speakLocked(text) }
+
+    private suspend fun speakLocked(text: String): Boolean {
         val engine = ttsReady() ?: return false
         val finished = CompletableDeferred<Boolean>()
         val listener = object : EventListener {
@@ -131,7 +138,9 @@ class PleosVoiceIO(
         }
     }
 
-    override suspend fun listen(timeoutMs: Long): ListenResult {
+    override suspend fun listen(timeoutMs: Long): ListenResult = busy.withLock { listenLocked(timeoutMs) }
+
+    private suspend fun listenLocked(timeoutMs: Long): ListenResult {
         val engine = sttReady() ?: return ListenResult.NoAnswer
         val collector = SegmentCollector()
         val listener = object : ResultListener {

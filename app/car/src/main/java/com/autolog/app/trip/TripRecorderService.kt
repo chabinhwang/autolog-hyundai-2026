@@ -19,13 +19,11 @@ import com.autolog.app.R
 import com.autolog.app.location.PleosLocationSource
 import com.autolog.app.sync.SyncWorker
 import com.autolog.app.vehicle.PleosVehicleSource
-import com.autolog.app.voice.PleosVoiceIO
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.io.File
 import java.time.Duration
 
 /**
@@ -36,7 +34,6 @@ class TripRecorderService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var vehicle: PleosVehicleSource? = null
     private var location: PleosLocationSource? = null
-    private var voice: PleosVoiceIO? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -46,7 +43,7 @@ class TripRecorderService : Service() {
         val container = (application as AutologApp).container
         val vehicleSource = PleosVehicleSource(this).also { vehicle = it }
         val locationSource = PleosLocationSource(this).also { location = it }
-        val voiceIO = PleosVoiceIO(this, debugAudio = if (BuildConfig.DEBUG) ::takeDebugAnswer else null).also { voice = it }
+        val voiceIO = container.voice
         val recorder = TripRecorder(
             vehicle = vehicleSource,
             location = locationSource,
@@ -70,20 +67,10 @@ class TripRecorderService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
-        voice?.release()
+        // 음성은 앱 전체가 함께 쓰므로(AppContainer.voice) 여기서 해제하지 않는다.
         location?.release()
         vehicle?.release()
         super.onDestroy()
-    }
-
-    /**
-     * debug 빌드 전용: filesDir/voice_answer.pcm이 있으면 마이크 대신 그 음성을 한 번 넣고 지운다.
-     * 마이크를 쓸 수 없는 개발 PC에서 도착 확인 흐름을 자동으로 시연·검증하기 위한 것.
-     */
-    private fun takeDebugAnswer(): ByteArray? {
-        val file = File(filesDir, "voice_answer.pcm")
-        if (!file.exists()) return null
-        return file.readBytes().also { file.delete() }
     }
 
     private fun startAsForeground(text: String) {
