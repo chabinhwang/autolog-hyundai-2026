@@ -132,7 +132,7 @@
 | `updated_at` | timestamptz | not null | 마지막 수정 반영 시각 |
 | `app_version` | varchar(20) | null | |
 
-- Odometer는 Vehicle SDK `getCurrentDistanceDriven()`이 km 단위 `Float`로 줍니다 (`docs/sdk/vehicle/api/odometer/get-current-distance-driven.md`). 소수 첫째 자리 반올림 저장 (제안).
+- Odometer는 Vehicle SDK `getCurrentDistanceDriven()`이 km 단위 `Float`로 줍니다 ([공식 문서](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/vehicle/ai.pleos.playground.vehicle.api/odometer/get-current-distance-driven)). 소수 첫째 자리 반올림 저장 (제안).
 
 ## trip_edit_log (수정 이력)
 

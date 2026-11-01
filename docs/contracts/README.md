@@ -37,7 +37,7 @@
 | D12 | 환경변수·시드 (G3) | 서버 설정은 전부 환경변수. 회사·관리자 시드는 서버 시작 시 같은 사업자등록번호가 없을 때만 생성 ([config.md](config.md)) | 운영 Compose에서 이미지 하나로 회사별 시드 가능 |
 | D13 | 보유 기간·동의 (G4) | 서버 운행 기록 5년 보유(국세기본법 장부 보존 기간 기준, 미확인). 직원별 동의를 차량 앱에서 받고 서버에 기록 ([rules §11](rules.md#11-개인정보-보유삭제동의-d13)) | 개인정보처리방침·동의 화면에 보유 기간이 필수 |
 | D14 | 기기 토큰 저장 (G5) | Android Keystore의 AES-GCM 키로 암호화해 DataStore에 저장 | `androidx.security:security-crypto`(EncryptedSharedPreferences)는 1.1.0에서 전 API 지원 중단, Keystore 직접 사용 권장 ([릴리스 노트](https://developer.android.com/jetpack/androidx/releases/security)) |
-| D15 | 관리자의 미확인 운행 확정 (**검토 필요**) | 1차는 허용. 관리자는 미확인 운행의 용도를 `COMMUTE`·`BUSINESS`로만 바꿀 수 있고, 바꾸면 마스킹이 풀려 집·미등록 라벨·메모·시각이 보임 ([rules §4](rules.md#4-수정-post-tripsclientuuidedits)) | 미확인이 남으면 업무비율을 확정할 수 없음. 다만 개인 운행 우회(D4)와 같은 성격의 위험이 있어, 운전자 확인 요청(2차) 도입 때 관리자 확정을 막을지 다시 정함 |
+| D15 | 관리자의 미확인 운행 확정 (**결정됨 2026-11-01**) | 허용. 관리자는 미확인 운행의 용도를 `COMMUTE`·`BUSINESS`로만 바꿀 수 있고, 바꾸면 마스킹이 풀려 집·미등록 라벨·메모·시각이 보임 ([rules §4](rules.md#4-수정-post-tripsclientuuidedits)). 사유 필수, 수정 이력에 관리자로 남음 | 미확인이 남으면 업무비율을 확정할 수 없음. 운전자가 답하지 않은 운행에 개인 운행이 섞일 수 있다는 점은 감수하기로 함 (사용자 결정) |
 
 ## 공통 규칙
 

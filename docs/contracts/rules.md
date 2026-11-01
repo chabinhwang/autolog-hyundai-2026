@@ -82,7 +82,7 @@
 - 차량: 자기 차량의 트립만(다른 차량 트립은 404), `clientEditUuid` 필수. 같은 키 재전송 → 200, `edit`는 처음 만든 이력, `current`는 지금 값 (바뀐 게 없던 요청은 이력이 없으므로 다시 평가)
 - 차량 수정의 `editedAt`이 서버 수신 시각 + 10분보다 미래면 400 `VALIDATION_FAILED` (D11)
 - 관리자: `reason` 필수(400 `EDIT_REASON_REQUIRED`), 현재 용도가 PERSONAL이면 403 `PERSONAL_TRIP_ADMIN_EDIT_FORBIDDEN`(D4). 관리자는 용도를 `COMMUTE`·`BUSINESS`로만 바꿀 수 있음: PERSONAL로 바꾸면 403 `PERSONAL_TRIP_ADMIN_EDIT_FORBIDDEN` (개인 여부는 운전자가 판단), UNCONFIRMED는 위 규칙대로 400
-- 관리자 수정 응답(`current`, `edit.changes`)도 §7 마스킹을 **수정 후** 용도 기준으로 적용. 미확인 운행을 업무·출퇴근으로 확정하면 그때부터 장소·메모·시각이 보임 (D15, 검토 필요)
+- 관리자 수정 응답(`current`, `edit.changes`)도 §7 마스킹을 **수정 후** 용도 기준으로 적용. 미확인 운행을 업무·출퇴근으로 확정하면 그때부터 장소·메모·시각이 보임 (D15, 결정됨 2026-11-01)
 - 대시보드는 가려진 메모(미확인 운행)를 관리자가 수정하지 못하게 막음 (원래 값을 모른 채 덮어쓰는 것 방지)
 - 현재값 = 서버 수신 순서상 마지막 이력. 차량·관리자 수정이 겹쳐도 둘 다 이력에 남음
 - 트립보다 수정이 먼저 도착 → 404 `TRIP_NOT_FOUND` → 차량 앱은 트립 업로드 후 재시도
