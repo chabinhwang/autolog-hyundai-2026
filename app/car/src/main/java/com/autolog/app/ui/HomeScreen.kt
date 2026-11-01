@@ -127,7 +127,12 @@ private fun StatusCard(status: TripRecorder.Status) {
 @Composable
 private fun UnconfirmedCard(trips: List<TripEntity>, choose: (TripEntity, Purpose) -> Unit, modifier: Modifier) {
     Card(modifier) {
-        Text("확인이 필요한 운행 ${trips.size}건", style = MaterialTheme.typography.titleLarge, color = AutoLogColors.Unconfirmed)
+        Text(
+            "확인이 필요한 운행 ${trips.size}건",
+            style = MaterialTheme.typography.titleLarge,
+            // 0건이면 경고색을 쓰지 않는다(할 일이 없는데 주의를 끌지 않게).
+            color = if (trips.isEmpty()) MaterialTheme.colorScheme.onSurface else AutoLogColors.Unconfirmed,
+        )
         Spacer(Modifier.height(12.dp))
         if (trips.isEmpty()) {
             Text("모든 운행의 용도가 정해졌어요.", color = AutoLogColors.Muted, style = MaterialTheme.typography.bodyLarge)
