@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -25,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -130,7 +133,7 @@ private fun UnconfirmedCard(trips: List<TripEntity>, choose: (TripEntity, Purpos
             Text("모든 운행의 용도가 정해졌어요.", color = AutoLogColors.Muted, style = MaterialTheme.typography.bodyLarge)
             return@Card
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        LazyColumn(state = rememberNewestFirstListState(trips.first().clientUuid), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             items(trips, key = { it.clientUuid }) { trip ->
                 Column(Modifier.fillMaxWidth().background(AutoLogColors.SurfaceRaised, RoundedCornerShape(16.dp)).padding(18.dp)) {
                     Text(summary(trip), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -172,10 +175,23 @@ private fun RecentCard(trips: List<TripEntity>, pendingCount: Int, failedCount: 
             Text("아직 기록된 운행이 없어요.", color = AutoLogColors.Muted, style = MaterialTheme.typography.bodyLarge)
             return@Card
         }
-        LazyColumn {
+        LazyColumn(state = rememberNewestFirstListState(trips.first().clientUuid)) {
             items(trips, key = { it.clientUuid }) { trip -> TripRow(trip) }
         }
     }
+}
+
+/**
+ * 최신순 목록용. key를 쓰는 LazyColumn은 맨 위에 새 항목이 들어오면 보던 항목에 위치를 고정해
+ * 새 운행이 화면 위로 숨는다(에뮬레이터에서 확인). 맨 위를 보고 있었다면 새 항목으로 따라 올라간다.
+ */
+@Composable
+private fun rememberNewestFirstListState(newestKey: String): LazyListState {
+    val state = rememberLazyListState()
+    LaunchedEffect(newestKey) {
+        if (state.firstVisibleItemIndex <= 1) state.scrollToItem(0)
+    }
+    return state
 }
 
 @Composable
