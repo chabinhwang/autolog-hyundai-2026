@@ -149,7 +149,7 @@ class PleosVoiceIO(
             override fun onUpdatedRms(rms: Double) = Unit
             override fun onStartedRecognition() = collector.onSpeechStarted()
             override fun onUpdated(stt: String, completed: Boolean) {
-                if (completed) collector.onFinalSegment(stt)
+                if (completed) collector.onFinalSegment(stt) else collector.onPartial(stt)
             }
 
             override fun onEndedRecognition() = Unit
