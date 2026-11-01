@@ -2,7 +2,7 @@
 
 > [계약 문서 목차](README.md)
 
-설계 초안은 2026-11-01 기준이며 구성 요소 내부 패키지 구조는 **(제안)**입니다. SDK 확인 사항은 2026-11-02에 갱신했습니다. 구현하면서 바뀌면 이 문서를 먼저 고칩니다.
+설계 초안은 2026-11-01 기준입니다. 차량 앱 내부 구조·2~6단계 구현·실측은 **확인됨 (2026-11-02)**이며 코드 `6cdbd35`·`25c6dc3`·`226fbb9`를 반영했습니다. 상세는 [차량 앱 구현 계약](car-app.md)을 따릅니다. 구현하면서 바뀌면 이 문서를 먼저 고칩니다.
 
 ## 1. 전체 구조
 
@@ -12,12 +12,12 @@
 │                                                             │
 │  Pleos SDK ──┐                                              │
 │  (Odometer,  │   ┌──────────┐   ┌──────────┐   ┌─────────┐  │
-│   위치, 내비, ├──▶│ 트립 감지 │──▶│ 용도 추정 │──▶│ 음성 확인│  │
+│   위치,      ├──▶│ 트립 감지 │──▶│ 용도 추정 │──▶│ 음성 확인│  │
 │   기어,      │   └──────────┘   └──────────┘   └────┬────┘  │
 │   STT/TTS) ──┘                                     ▼        │
 │                      ┌───────────────────────────────────┐  │
 │                      │ Room (로컬 DB, 오프라인 우선)       │  │
-│                      │ 트립 · 수정 이력 · 집 위치 · 설정   │  │
+│                      │ 트립 · 수정 · 장소 · 직원 · 동의   │  │
 │                      └──────────────┬────────────────────┘  │
 │                                     │ WorkManager 업로드 큐  │
 └─────────────────────────────────────┼───────────────────────┘
@@ -66,12 +66,15 @@
 
 ```text
 기어 P→D/R (시작 Odometer·시각) → 주행 → P 3분 (debug 시연은 30초, 종료 Odometer)
-→ 용도 추정 (집/회사/거래처 + 시간대 + 내비 목적지)
-→ TTS "출근으로 기록할까요?" → STT "응" (10초 무응답 = 미확인)
-→ Room 저장 (PENDING) → 네트워크 되면 PUT /trips/batch → SYNCED
+→ 용도 추정 (집/회사/거래처 + Asia/Seoul 시간대)
+→ Room에 UNCONFIRMED/AUTO 먼저 저장 (PENDING, 답변 대기)
+→ TTS 질문 → STT 조각 수집 (10초 대기, 조각 사이 1.5초 쉼)
+→ 음성 결과 반영 → WorkManager PUT /trips/batch → SYNCED
 ```
 
 - 오프라인 우선: 네트워크가 없어도 기록은 차에 남고 나중에 올라감
+- 질문 중 앱이 꺼지면 다음 실행 때 답변 대기를 해제해 미확인으로 업로드. 진행 중 시작 값은 DataStore에서 복구
+- 트립 좌표는 장소 판정 후 버리고 Room에 저장하지 않음. 1차 NaviHelper 미사용, 미등록 장소 라벨은 `null`
 - 중복 방지: 차량이 만든 `clientUuid`. 다시 보내도 `DUPLICATE`
 - 회사·차량은 서버가 토큰으로 결정. 요청 본문의 차량 ID는 신뢰하지 않음
 - 1차 종료 확정은 P 유지 시간만 사용. 0.5km 미만은 직전 트립이 `PENDING`이면 병합하고, 이미 서버에 올라갔으면 D3에 따라 기록하지 않고 버림 (구현 기준, 결정됨 2026-11-02)
@@ -92,24 +95,31 @@
 서버: 회사 범위 필터 → 마스킹(개인 운행 장소·시각 가림) → JSON 또는 XLSX
 ```
 
-## 3. 구성 요소 내부 구조 (제안)
+## 3. 구성 요소 내부 구조
 
-### 차량 앱
+### 차량 앱 (실제 구현, 확인됨 2026-11-02)
 
 ```text
 com.autolog.app
-├── vehicle/   Pleos Vehicle SDK 2.3.2(Odometer·Gear) 래퍼
-├── location/  LocationSource ← FusedLocation SDK | Android 위치 API
-├── voice/     VoiceIO       ← Pleos STT/TTS | Android TextToSpeech/SpeechRecognizer
-├── trip/      트립 감지 상태 머신 (Foreground Service), 0.5km 미만 병합·폐기 판단
-├── purpose/   용도 추정 규칙, 음성 응답 해석
-├── data/      Room (trip, trip_edit, place[집 포함], config)
-├── sync/      WorkManager 작업 + Retrofit API 클라이언트
-├── pairing/   토큰 생성·보관, 페어링 화면
-└── ui/        Compose 화면, CarUxRestrictions(주행 중 제한)
+├── domain/    열거값·모델
+├── trip/      TripDetector, ShortTripPolicy, TripRecorder, TripRecorderService, BootReceiver
+├── purpose/   PlaceMatcher, PurposeEstimator, VoiceAnswerParser
+├── data/
+│   ├── local/     Room (trip, trip_edit, place, driver, consent)
+│   ├── remote/    Retrofit API·기기 인증 인터셉터
+│   ├── settings/  DataStore (기기·차량·동의 버전·진행 중 시작 값)
+│   └── TripRepository, ConsentRepository
+├── sync/      SyncEngine, SyncWorker, TripMapper
+├── pairing/   PairingController, DeviceTokens, KeystoreCipher
+├── vehicle/   VehicleSource ← PleosVehicleSource
+├── location/  LocationSource ← PleosLocationSource
+├── voice/     VoiceIO ← PleosVoiceIO, SegmentCollector
+├── export/    CsvExporter
+└── ui/        Compose (정차 중 화면)
 ```
 
-- `LocationSource`, `VoiceIO`는 인터페이스. Pleos SDK가 에뮬레이터에서 안 되면 Android 표준 API 구현으로 교체
+- `VehicleSource`·`LocationSource`·`VoiceIO` 인터페이스는 유지. Pleos SDK가 동작해 Android 표준 TTS·위치 대체 구현은 만들지 않음
+- DO 미선언이며 플랫폼이 주행 중 화면 차단. `CarUxRestrictions` 리스너는 두지 않고 도착 확인은 음성으로 처리
 - 트립 감지·용도 추정은 SDK에 의존하지 않는 순수 Kotlin으로 두어 단위 테스트
 
 ### 서버
@@ -184,18 +194,25 @@ src/
 
 ### 에뮬레이터·연결 실측 (확인됨 2026-11-02)
 
-- debug 앱 → 호스트 로컬 서버 `http://10.0.2.2:8080` HTTP 200, 외부 HTTPS 통신을 확인했습니다. WorkManager 실행 확인과는 별개입니다.
+- debug 앱 → 호스트 로컬 서버 `http://10.0.2.2:8080` HTTP 200, 외부 HTTPS 통신을 확인했습니다. 2~6단계에서는 트립 저장·화면 수정 직후 WorkManager 업로드 성공도 **확인됨 (2026-11-02)**.
 - Virtual Console은 `adb forward tcp:8088 tcp:8088` 후 브라우저에서 `http://127.0.0.1:8088/`을 한 번 열어 활성화해야 합니다. 열기 전 HTTP 쓰기는 `{"error":"emulator_inactive"}`입니다.
 - 활성화 후 `PUT /vehicle/gear?gear=Drive`로 제어할 수 있으며 `Park` / `Reverse` / `Neutral`도 받습니다. `PUT /vehicle/odometer?traveled_distance_km=12.4`는 소수를 받습니다. 1km 단위인 것은 화면 슬라이더이며, HTTP로 12.4km 시연이 가능합니다.
-- 에뮬레이터 기본 시간대는 호스트 환경에 따라 `America/Los_Angeles`일 수 있음을 확인했습니다. 차량 앱은 용도 추정·사용일자 계산에 `Asia/Seoul`을 명시해야 합니다. 용도 추정은 `18fdac4`의 `PurposeEstimator` 코드에서 명시된 것을 **확인됨 (2026-11-02)**. 차량 앱 사용일자 계산 반영은 예정입니다.
+- 에뮬레이터 기본 시간대는 호스트 환경에 따라 `America/Los_Angeles`일 수 있음을 확인했습니다. 용도 추정과 CSV 사용일자·시각은 `Asia/Seoul`을 명시한 것을 **확인됨 (2026-11-02)**. 서버 `tripDate`는 별도로 시작 시각의 서울 날짜를 계산합니다.
 
 이미지 설치·AVD 생성·Virtual Console 연결은 **완료 (확인됨 2026-11-02)**. 이미지·부팅·Virtual Console 설정은 루트 [README](../../README.md#테스트-환경필요한-설정)를 따릅니다.
+
+### 2~6단계 실측 (확인됨 2026-11-02)
+
+- 화면에서 Foreground Service를 `specialUse|microphone`으로 실행 (`types=0x40000080`). 부팅 직후 `microphone` 거부 시 `specialUse`로 실행하도록 구현
+- 페어링 → 설정·이용자·동의·집 등록 → 12.4km 업무 운행 음성 확인 → 서버 `HOME→CLIENT`, `BUSINESS/VOICE/VISIT` → 대시보드 표시 → 이번 달 CSV 저장까지 확인
+- 무응답 `UNCONFIRMED/AUTO` 업로드·마스킹 → 차량 화면 '개인' → `PERSONAL/MANUAL` 수정 이력 → 대시보드 '장소 비공개·수정됨' 확인
+- 저장·수정·실패 정책·권한·CSV 열은 [차량 앱 구현 계약](car-app.md)을 따름
 
 ## 6. 확인 안 된 전제
 
 | 항목 | 영향 | 확인 방법 |
 | --- | --- | --- |
-| Foreground Service·WorkManager 실행 (미확인) | `trip/`, `sync/` 구현 방식 | Pleos AVD에서 실행·재시도 확인 |
+| 부팅 직후 specialUse만 실행한 서비스의 STT 마이크 사용 (미확인) | 도착 질문 음성 입력 | 실패 시 미확인으로 보존, 정차 중 화면 3버튼으로 처리 |
 | 에뮬레이터 호스트 마이크 입력·macOS 마이크 권한 (미확인) | `voice/` 입력 경로 | 이 PC 권한·에뮬레이터 마이크 경로 확인. sendAudio PCM 인식은 확인됨 |
 
 모두 차량 앱 내부 구현에만 영향이 있고, 서버·대시보드 구조와 API 계약은 바뀌지 않습니다.

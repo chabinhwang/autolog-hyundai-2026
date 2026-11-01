@@ -1,0 +1,75 @@
+# 차량 앱 구현 계약
+
+> [계약 문서 목차](README.md) · [전체 구조](architecture.md) · [서버 규칙](rules.md)
+
+차량 앱 2~6단계 구현·Pleos Connect Emulator 2.1.0 실측으로 **확인됨 (2026-11-02)**. 코드 기준은 `6cdbd35`, `25c6dc3`, `226fbb9`입니다. 아래 구현 사실과 아직 미확인·미구현인 항목을 구분합니다.
+
+## 1. 기록·복구·수정
+
+- 종료 확정 즉시 Room에 `UNCONFIRMED` / `AUTO`로 먼저 저장하고 답변 대기 표시를 둡니다. 음성 결과를 반영한 뒤 업로드합니다. 질문 중 앱이 종료되면 다음 실행 때 답변 대기를 해제해 미확인으로 업로드합니다.
+- 완료된 트립의 출발·도착 좌표는 장소 판정 후 버리며 Room `trip`에 저장하지 않습니다. 장소 판정용 `place` 좌표는 별도로 보관합니다. 진행 중 시작 값은 DataStore에 보관해 서비스 재시작 후 이어 기록합니다.
+- 업로드 전 용도 수정은 로컬 값만 바꿉니다. 업로드된 트립은 `trip_edit`을 만들어 `POST /trips/{clientUuid}/edits`로 보냅니다.
+- 업로드 요청·응답 사이 로컬 용도가 바뀌면 업로드를 `SYNCED`로 처리한 뒤 현재 용도를 수정 이력으로 다시 보냅니다.
+- 0.5km 미만 트립은 직전 미전송(`PENDING`) 트립에 병합합니다. 직전 트립이 이미 업로드됐으면 서버 자동값 불변 D3에 따라 새 짧은 트립을 기록하지 않고 버립니다.
+- 1차 종료 조건은 P 유지 시간뿐입니다. release 180초, debug 30초이며 도어 열림 종료는 미구현입니다.
+
+## 2. 서비스·동기화
+
+| 항목 | 구현·실측 결과 (확인됨 2026-11-02) |
+| --- | --- |
+| 화면에서 기록 서비스 시작 | `specialUse` + `microphone` Foreground Service 실행. `dumpsys`의 `types=0x40000080` 확인 |
+| `BOOT_COMPLETED`에서 시작 | `microphone` 유형이 거부되면 `specialUse`만으로 실행. 이때 도착 STT 마이크 사용 가능 여부는 **미확인** |
+| WorkManager | 트립 저장·화면 수정 직후 작업 실행 → `10.0.2.2:8080` 로컬 서버 업로드 성공 |
+| 순서·트리거 | 동의 → 트립 → 수정 → 설정. 저장·수정·앱 시작 직후 `trip-sync`, 15분 주기 `trip-sync-periodic`, 네트워크 연결 조건 |
+| 401 | 기기 토큰 삭제, 페어링 화면 안내. 로컬 기록 유지 |
+| 429·5xx·네트워크 오류 | WorkManager 재시도. 즉시 작업의 지수 백오프는 30초부터 시작 |
+| 트립 업로드 요청 전체 400 | 해당 묶음을 `FAILED`로 표시 |
+| 페어링 코드 발급·조회 | 이전 기기 토큰을 요청에 붙이지 않음 |
+
+부팅 직후 STT 등 음성 확인이 실패하면 트립을 미확인으로 남기고 정차 중 화면의 출퇴근·업무·개인 3버튼으로 정리합니다. 부팅 경로의 마이크 동작까지 확인됐다고 해석하지 않습니다.
+
+## 3. 음성·용도 추정·주행 제한
+
+- `PleosVoiceIO`는 Pleos TTS/STT `ON_DEVICE`, `SegmentCollector`는 질문 후 10초 응답 대기·조각 사이 1.5초 쉼으로 응답 끝을 처리합니다. EPD별 `completed=true` 조각을 모아 해석합니다.
+- 해석 우선순위: 용도 단어(출근·퇴근·업무·방문·회의·판촉·교육 등) → 개인·아니 → 예·응. 추정 용도가 미확인일 때 '응'만 하면 미확인을 유지합니다.
+- 확정 안내 예: "출퇴근으로 기록했어요." / "거래처 방문 업무로 기록했어요." / "개인 운행으로 기록했어요." / "미확인으로 남겨 둘게요. 정차 중에 화면에서 골라 주세요."
+- 출근은 평일 06:00~10:59, 퇴근은 평일 16:00~22:59이며 `Asia/Seoul`을 명시합니다. 주말에는 출퇴근을 추정하지 않습니다. CSV 사용일자·시각도 `Asia/Seoul` 기준입니다.
+- 1차는 등록 장소와 시간대로 추정합니다. NaviHelper는 사용하지 않아 미등록 장소의 서버 전송 라벨은 `null`입니다. 목적지명 연동은 2차입니다.
+- DO(Distraction Optimization) 미선언. 화면은 정차 중에만 쓰고 도착 확인은 음성으로 처리합니다. 플랫폼이 주행 중 화면을 차단하며 앱에는 `CarUxRestrictions` 리스너가 없습니다.
+- `VehicleSource`·`LocationSource`·`VoiceIO` 인터페이스와 Pleos 구현을 유지합니다. Android 표준 TTS·위치 대체 구현은 만들지 않았습니다.
+
+## 4. 권한·동의
+
+- 실제 매니페스트 권한: `android.permission.INTERNET`, `pleos.car.permission.CAR_DRIVE`, `pleos.car.permission.FUSED_LOCATION`, `pleos.car.permission.TTS_SERVICE`, `pleos.car.permission.STT_SERVICE`, `android.permission.RECORD_AUDIO`, `android.permission.FOREGROUND_SERVICE`, `android.permission.FOREGROUND_SERVICE_SPECIAL_USE`, `android.permission.FOREGROUND_SERVICE_MICROPHONE`, `android.permission.POST_NOTIFICATIONS`, `android.permission.RECEIVE_BOOT_COMPLETED`.
+- 런타임 요청: `FUSED_LOCATION`, `RECORD_AUDIO`, API 33 이상에서 `POST_NOTIFICATIONS`. minSdk 28에서는 지원 API 범위에 맞춰 서비스 시작·CSV 저장 경로를 처리합니다.
+- 동의 화면은 [rules §11](rules.md#11-개인정보-보유삭제동의-d13)의 수집 항목·관리자 열람 범위·보유 기간을 표시합니다. 설정을 아직 받지 않아 동의 문서 버전을 모르면 동의를 기록하지 않습니다.
+- 동의 문구의 내비 목적지명은 확장 범위이며 1차 전송값은 미등록 장소 라벨 `null`입니다.
+
+## 5. 빌드·CSV
+
+| 빌드 | API 호스트 | P 유지 종료 확정 | 검증 기능 |
+| --- | --- | --- | --- |
+| release | `https://autolog-api.aihub.io.kr` | 180초 | 일반 사용 |
+| debug | `http://10.0.2.2:8080` | 30초 | `ProbeActivity`, `filesDir/voice_answer.pcm`이 있으면 마이크 대신 한 번 주입 후 삭제 |
+
+- 주입 PCM 형식은 16kHz·16bit·mono입니다. 이 경로의 시연 성공과 호스트 마이크 정상 동작 확인은 구분합니다.
+- 이번 달 CSV의 14개 열: 사용일자, 부서, 성명, 주행 전 계기판 거리(km), 주행 후 계기판 거리(km), 주행거리(km), 출퇴근용(km), 일반 업무용(km), 용도, 출발, 도착, 시작, 종료, 비고.
+- UTF-8 BOM을 붙이고 엑셀 수식처럼 보이는 문자열 앞에는 `'`를 추가합니다. 쉼표·따옴표·줄바꿈을 이스케이프합니다.
+- API 29 이상은 다운로드 폴더, API 28은 앱 전용 다운로드 폴더에 저장합니다. CSV는 차량 앱의 운행 내역이며 서식 파일 XLSX는 서버에서 만듭니다.
+- 검증 명령은 루트 [README](../../README.md#차량-앱). 차량 앱 단위 테스트 65개가 확인된 기준입니다 (2026-11-02).
+
+## 6. 처음부터 끝까지 실측한 흐름
+
+다음은 Pleos Connect Emulator 2.1.0에서 **확인됨 (2026-11-02)**.
+
+1. 페어링 코드 표시 → 관리자 `POST /devices/pair` → 설정 수신 → 이용자 선택·동의 → 집 등록.
+2. Virtual Console D → Odometer 1000 → 1012.4 → P → debug 30초 후 "한빛상사 도착, 12.4킬로미터. 한빛상사 방문, 업무로 기록할까요?".
+3. STT "네 맞아요" → "거래처 방문 업무로 기록했어요." → 서버 `HOME` → `CLIENT`, `BUSINESS` / `VOICE` / `VISIT`, 12.4km → 대시보드 운행 기록 표시.
+4. 무응답은 `UNCONFIRMED` / `AUTO`로 업로드·대시보드 마스킹. 차량 화면 '개인' → `PERSONAL` / `MANUAL` 수정 이력(`edited`) → 대시보드 '장소 비공개·수정됨'.
+5. 이번 달 CSV가 다운로드 폴더에 저장됨.
+
+## 7. 남은 항목
+
+- **미확인**: 부팅 직후 `specialUse`만 실행한 서비스에서 도착 질문 STT가 마이크를 쓸 수 있는지. 실패 시 미확인·화면 3버튼으로 처리.
+- **미확인**: 이 PC의 에뮬레이터 호스트 마이크 경로·macOS 마이크 권한. debug PCM 주입 성공과 별개.
+- **미구현**: 동기화 후 90일 지난 트립 자동 삭제(DAO 쿼리만 있음), NaviHelper 미등록 장소 라벨, 도어 열림 종료.
