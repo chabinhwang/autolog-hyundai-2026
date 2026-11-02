@@ -81,7 +81,7 @@ private fun DriverRow(name: String, dept: String?, selected: Boolean, onClick: (
 @Composable
 fun ConsentDialog(driver: DriverEntity, onAccept: () -> Unit, onDecline: () -> Unit) {
     PleosPopup(
-        title = "${driver.name}님, 운행 기록 동의",
+        title = "${driver.name}님, 운행 기록에 동의해 주세요",
         onDismiss = onDecline,
         large = true,
         confirm = "동의" to onAccept,
@@ -91,11 +91,14 @@ fun ConsentDialog(driver: DriverEntity, onAccept: () -> Unit, onDecline: () -> U
             Modifier.fillMaxWidth().heightIn(max = 560.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Item("수집 항목", "사용일자, 주행 전·후 계기판 거리, 출발·도착 장소명(회사·거래처·'집'·내비 목적지명), 운행 용도·업무 세부·메모, 이용자(부서·성명)")
-            Item("서버로 보내지 않는 것", "좌표, 집 위치")
-            Item("관리자가 볼 수 있는 범위", "개인 운행은 날짜와 거리만 보이고 장소·시각·메모는 가려져요.")
-            Item("보유 기간", "서버 운행 기록은 장부 보존 기간(5년) 동안, 차량에는 전송 후 90일까지 보관해요.")
-            Item("거부할 수 있어요", "동의하지 않으면 이 직원 이름으로 운행을 기록할 수 없어요.")
+            Item(
+                "어떤 정보를 기록하나요",
+                "운행 날짜, 출발·도착 때의 계기판 거리, 출발지·도착지 이름(회사·거래처·집·내비 목적지), 운행 용도와 메모, 운전한 사람(부서·이름)을 기록해요.",
+            )
+            Item("차량 밖으로 보내지 않아요", "정확한 위치(좌표)와 집 위치는 차량 안에만 두고 서버로 보내지 않아요.")
+            Item("관리자에게는 이만큼 보여요", "개인 운행은 날짜와 거리만 보여요. 장소·시각·메모는 관리자도 볼 수 없어요.")
+            Item("얼마나 보관하나요", "회사 서버에는 장부 보존 기간인 5년 동안, 차량에는 서버로 보낸 뒤 90일까지 보관해요.")
+            Item("동의하지 않아도 돼요", "다만 동의하지 않으면 ${driver.name}님 이름으로는 운행을 기록할 수 없어요.")
         }
     }
 }
