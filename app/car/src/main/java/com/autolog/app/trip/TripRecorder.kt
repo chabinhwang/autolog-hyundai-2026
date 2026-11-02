@@ -54,10 +54,19 @@ class TripRecorder(
     private val tickMs: Long = 2_000,
     private val answerTimeoutMs: Long = 10_000,
 ) {
-    /** 화면 표시용 상태. */
-    data class Status(val driving: Boolean, val lastMessage: String?)
+    /** 화면 표시용 단계. 주행 중엔 플랫폼이 화면을 가리므로 정차 후 단계(PARKED·ASKING)를 보여주는 게 핵심이다. */
+    enum class Phase { IDLE, DRIVING, PARKED, ASKING }
 
-    private val _status = MutableStateFlow(Status(driving = false, lastMessage = null))
+    /** 화면 표시용 상태. [prompt]는 도착 질문 중일 때 읽어 준 문장(화면에도 같이 띄운다). */
+    data class Status(val phase: Phase, val lastMessage: String?, val prompt: String? = null) {
+        val driving: Boolean get() = phase != Phase.IDLE
+
+        companion object {
+            val Idle = Status(Phase.IDLE, lastMessage = null)
+        }
+    }
+
+    private val _status = MutableStateFlow(Status.Idle)
     val status: StateFlow<Status> = _status.asStateFlow()
 
     private val lock = Mutex()
@@ -66,7 +75,7 @@ class TripRecorder(
     fun start(scope: CoroutineScope) {
         scope.launch {
             detector = TripDetector(parkConfirm, restoreState())
-            _status.value = _status.value.copy(driving = detector.state !is TripDetector.State.Idle)
+            _status.value = _status.value.copy(phase = phaseOf(detector.state))
             vehicle.currentOdometerKm()?.let { km -> lock.withLock { detector.onOdometer(km) } }
             location.lastKnown()?.let { point -> lock.withLock { detector.onLocation(point) } }
             launch { vehicle.odometerKm().collect { km -> lock.withLock { detector.onOdometer(km) } } }
@@ -84,14 +93,17 @@ class TripRecorder(
     private suspend fun handle(event: TripDetector.Event?) {
         persistState()
         when (event) {
-            null -> Unit
+            null -> {
+                // D → P 전환처럼 이벤트 없이 단계만 바뀌는 경우(정차 확인 시작·재출발).
+                val phase = phaseOf(lock.withLock { detector.state })
+                _status.value.let { if (it.phase != Phase.ASKING && it.phase != phase) _status.value = it.copy(phase = phase) }
+            }
             is TripDetector.Event.TripStarted -> {
-                _status.value = Status(driving = true, lastMessage = null)
+                _status.value = Status(Phase.DRIVING, lastMessage = null)
                 // 주행 중에 설정(관리자가 추가한 장소·직원 변경)을 받아 두어 도착 판정에 쓴다.
                 requestSync()
             }
             is TripDetector.Event.TripCompleted -> {
-                _status.value = _status.value.copy(driving = false)
                 complete(event.trip)
             }
         }
@@ -101,6 +113,7 @@ class TripRecorder(
         val vehicleInfo = settings.vehicleNow()
         if (vehicleInfo == null) {
             Log.w(TAG, "페어링 전이라 트립을 기록하지 않음")
+            _status.value = Status(Phase.IDLE, NOT_PAIRED_MESSAGE)
             return
         }
         val places = repository.places()
@@ -108,14 +121,22 @@ class TripRecorder(
         val dest = PlaceMatcher.match(trip.end.location, places)
         val estimate = PurposeEstimator.estimate(origin, dest, trip.start.at)
         when (val result = repository.record(trip, origin, dest, estimate, vehicleInfo.id, settings.currentDriverNow())) {
-            TripRepository.RecordResult.Dropped -> Log.i(TAG, "0.5km 미만 트립, 기록하지 않음")
-            is TripRepository.RecordResult.Merged -> requestSync()
+            TripRepository.RecordResult.Dropped -> {
+                Log.i(TAG, "0.5km 미만 트립, 기록하지 않음")
+                _status.value = Status(Phase.IDLE, DROPPED_MESSAGE)
+            }
+            is TripRepository.RecordResult.Merged -> {
+                _status.value = Status(Phase.IDLE, MERGED_MESSAGE)
+                requestSync()
+            }
             is TripRepository.RecordResult.Saved -> {
-                voice.speak(PurposeEstimator.arrivalPrompt(dest, trip.distanceKm, estimate))
+                val prompt = PurposeEstimator.arrivalPrompt(dest, trip.distanceKm, estimate)
+                _status.value = Status(Phase.ASKING, lastMessage = null, prompt = prompt)
+                voice.speak(prompt)
                 val decision = VoiceAnswerParser.resolve(estimate, listenWithRetry())
                 repository.applyVoiceDecision(result.trip.clientUuid, decision)
                 val message = confirmation(decision)
-                _status.value = _status.value.copy(lastMessage = message)
+                _status.value = Status(Phase.IDLE, message)
                 voice.speak(message)
                 requestSync()
             }
@@ -126,10 +147,17 @@ class TripRecorder(
     private suspend fun listenWithRetry(): String? {
         var heard = voice.listen(answerTimeoutMs)
         if (heard == ListenResult.EngineError) {
+            _status.value = _status.value.copy(prompt = RETRY_PROMPT)
             voice.speak(RETRY_PROMPT)
             heard = voice.listen(answerTimeoutMs)
         }
         return (heard as? ListenResult.Heard)?.text
+    }
+
+    private fun phaseOf(state: TripDetector.State): Phase = when (state) {
+        TripDetector.State.Idle -> Phase.IDLE
+        is TripDetector.State.Driving -> Phase.DRIVING
+        is TripDetector.State.Parked -> Phase.PARKED
     }
 
     private suspend fun persistState() {
@@ -161,6 +189,9 @@ class TripRecorder(
     companion object {
         private const val TAG = "AutoLogRecorder"
         const val RETRY_PROMPT = "잘 듣지 못했어요. 한 번 더 말씀해 주세요."
+        const val DROPPED_MESSAGE = "0.5km 미만 운행이라 기록하지 않았어요."
+        const val MERGED_MESSAGE = "잠깐 멈췄다 다시 출발해 이전 운행에 이어서 기록했어요."
+        const val NOT_PAIRED_MESSAGE = "차량 등록 전이라 운행을 기록하지 않았어요."
 
         fun confirmation(decision: PurposeDecision): String = when (decision.purpose) {
             Purpose.COMMUTE -> "출퇴근으로 기록했어요."

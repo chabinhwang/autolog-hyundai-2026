@@ -47,7 +47,7 @@ class AppContainer(context: Context) {
     val api: AutologApi = ApiFactory.create("${BuildConfig.API_BASE_URL}/api/v1/", ::currentToken)
 
     /** 기록 서비스가 알려주는 상태. 화면에서 주행 중 여부·마지막 안내를 보여준다. */
-    val recorderStatus = kotlinx.coroutines.flow.MutableStateFlow(com.autolog.app.trip.TripRecorder.Status(driving = false, lastMessage = null))
+    val recorderStatus = kotlinx.coroutines.flow.MutableStateFlow(com.autolog.app.trip.TripRecorder.Status.Idle)
 
     val tripRepository = TripRepository(database.tripDao(), database.tripEditDao(), database.placeDao())
     val consentRepository = ConsentRepository(database.consentDao(), settings)

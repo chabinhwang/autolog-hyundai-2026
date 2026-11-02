@@ -1,6 +1,7 @@
 package com.autolog.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -169,51 +170,79 @@ private fun Avatar(name: String) {
     }
 }
 
-/** 지금 상태. 주행 중에는 화면을 보지 않으므로 정차 중 한눈에 읽히는 크기로만 보여준다. */
+/** 지금 단계별 표시. 주행 중엔 플랫폼이 화면을 가리므로 정차 확인·도착 질문 단계를 분명히 보여준다. */
+private data class PhaseLook(val title: String, val hint: String, val step: Int)
+
 @Composable
 private fun StatusCard(status: TripRecorder.Status, modifier: Modifier = Modifier, showGuide: Boolean = false) {
-    val accent = if (status.driving) AutoLogColors.active else AutoLogColors.personal
+    val colors = AutoLogColors
+    val look = when (status.phase) {
+        TripRecorder.Phase.IDLE -> PhaseLook("운행 대기 중", "기어를 D로 바꾸면 자동으로 기록해요.", 0)
+        TripRecorder.Phase.DRIVING -> PhaseLook("운행 기록 중", "도착해서 P에 세우면 용도를 한 번 물어볼게요.", 1)
+        TripRecorder.Phase.PARKED -> PhaseLook("정차 확인 중", "P로 잠시 서 있으면 운행을 마무리해요. 바로 다시 출발하면 같은 운행으로 이어져요.", 2)
+        TripRecorder.Phase.ASKING -> PhaseLook("도착 확인 중", "대답을 듣고 있어요. \"네\" 또는 \"업무\"·\"개인\"처럼 말해 주세요.", 3)
+    }
+    val accent = when (status.phase) {
+        TripRecorder.Phase.IDLE -> colors.personal
+        TripRecorder.Phase.DRIVING -> colors.active
+        TripRecorder.Phase.PARKED -> colors.caution
+        TripRecorder.Phase.ASKING -> colors.positive
+    }
     PleosCard(
         modifier.fillMaxWidth(),
-        color = if (status.driving) AutoLogColors.tint(AutoLogColors.active) else AutoLogColors.surface,
+        color = if (status.phase == TripRecorder.Phase.IDLE) colors.surface else colors.tint(accent),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(28.dp).background(accent, CircleShape))
             Spacer(Modifier.width(24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(if (status.driving) "운행 기록 중" else "운행 대기 중", style = PleosType.TitleLarge, color = AutoLogColors.text)
+                Text(look.title, style = PleosType.TitleLarge, color = colors.text)
                 Text(
-                    status.lastMessage ?: if (showGuide) "다음 운행을 기록할 준비가 됐어요." else "기어를 D로 바꾸면 자동으로 기록해요.",
+                    // 대기 중이면 마지막 결과(확정 안내·기록 안 함 사유)를, 진행 중이면 지금 할 일을 보여준다.
+                    if (status.phase == TripRecorder.Phase.IDLE) status.lastMessage ?: look.hint else look.hint,
                     style = PleosType.BodyMedium,
-                    color = AutoLogColors.textTertiary,
+                    color = colors.textTertiary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+        status.prompt?.takeIf { status.phase == TripRecorder.Phase.ASKING }?.let { prompt ->
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "“$prompt”",
+                style = PleosType.TitleSmall,
+                color = colors.text,
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(colors.surface).padding(28.dp),
+            )
+        }
         if (showGuide) {
             Spacer(Modifier.height(32.dp))
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                GuideStep(1, "기어 D", "자동으로 기록 시작", Modifier.weight(1f))
-                GuideStep(2, "도착", "용도를 음성으로 질문", Modifier.weight(1f))
-                GuideStep(3, "대답", "한마디면 기록 완료", Modifier.weight(1f))
+                GuideStep(1, "기어 D", "자동으로 기록 시작", look.step == 1, Modifier.weight(1f))
+                GuideStep(2, "도착", "용도를 음성으로 질문", look.step == 2, Modifier.weight(1f))
+                GuideStep(3, "대답", "한마디면 기록 완료", look.step == 3, Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-private fun GuideStep(number: Int, title: String, body: String, modifier: Modifier) {
+private fun GuideStep(number: Int, title: String, body: String, current: Boolean, modifier: Modifier) {
+    val colors = AutoLogColors
     Column(
-        modifier.fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(AutoLogColors.surfaceHigh).padding(24.dp),
+        modifier.fillMaxHeight().clip(RoundedCornerShape(24.dp))
+            .background(if (current) colors.surface else colors.surfaceHigh)
+            .then(if (current) Modifier.border(3.dp, colors.positive, RoundedCornerShape(24.dp)) else Modifier)
+            .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.size(64.dp).background(AutoLogColors.positive, CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(64.dp).background(colors.positive, CircleShape), contentAlignment = Alignment.Center) {
             Text(number.toString(), style = PleosType.TitleSmall, color = androidx.compose.ui.graphics.Color.White)
         }
-        Text(title, style = PleosType.TitleSmall, color = AutoLogColors.text, maxLines = 1)
-        Text(body, style = PleosType.BodySmall, color = AutoLogColors.textTertiary, maxLines = 2, textAlign = TextAlign.Center)
+        Text(title, style = PleosType.TitleSmall, color = colors.text, maxLines = 1)
+        Text(body, style = PleosType.BodySmall, color = colors.textTertiary, maxLines = 2, textAlign = TextAlign.Center)
     }
 }
 

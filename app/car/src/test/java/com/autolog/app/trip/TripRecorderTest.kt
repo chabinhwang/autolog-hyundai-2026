@@ -68,12 +68,15 @@ class TripRecorderTest {
         private val queue = ArrayDeque(results.toList())
         val spoken = mutableListOf<String>()
         var listens = 0
+        /** 실제 STT처럼 듣는 데 시간이 걸리게 한다(질문 중 상태를 관찰하는 테스트용). */
+        var listenDelayMs = 0L
         override suspend fun speak(text: String): Boolean {
             spoken += text
             return true
         }
         override suspend fun listen(timeoutMs: Long): ListenResult {
             listens++
+            delay(listenDelayMs)
             return queue.removeFirstOrNull() ?: ListenResult.NoAnswer
         }
         override fun release() = Unit
@@ -153,6 +156,36 @@ class TripRecorderTest {
         assertEquals("출퇴근으로 기록했어요.", voice.spoken[1])
         // 주행 시작 때 한 번(설정 미리 받기), 저장 후 한 번
         assertTrue("syncRequests=$syncRequests", syncRequests >= 2)
+    }
+
+    @Test
+    fun `도착 질문 중에는 질문 문장을 화면 상태로 내보내고 끝나면 확정 안내를 남긴다`() = runBlocking {
+        val voice = FakeVoice("응").apply { listenDelayMs = 300 }
+        val recorder = recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)))
+        recorder.start(scope)
+        delay(200)
+
+        drive(100.0, 112.4, COMPANY)
+
+        val asking = withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.ASKING } }
+        assertEquals("본사 도착, 12.4킬로미터. 출근으로 기록할까요?", asking.prompt)
+        val done = withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.IDLE && it.lastMessage != null } }
+        assertEquals("출퇴근으로 기록했어요.", done.lastMessage)
+    }
+
+    @Test
+    fun `P에 세우면 정차 확인 단계가 되고 0점5km 미만이면 기록하지 않았다고 알린다`() = runBlocking {
+        val recorder = recorder(FakeVoice("응"), FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)))
+        recorder.start(scope)
+        delay(200)
+
+        drive(100.0, 100.2, COMPANY)
+
+        withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.PARKED } }
+        val done = withTimeout(5_000) { recorder.status.first { it.lastMessage != null } }
+        assertEquals(TripRecorder.Phase.IDLE, done.phase)
+        assertEquals(TripRecorder.DROPPED_MESSAGE, done.lastMessage)
+        assertTrue(trips.rows.value.isEmpty())
     }
 
     @Test
