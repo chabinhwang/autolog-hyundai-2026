@@ -16,7 +16,7 @@
 
 ```mermaid
 flowchart LR
-    P["대시보드 · Cloudflare Pages"] --> N["공통 Nginx · Oracle 80/443"]
+    P["대시보드 · Cloudflare Pages<br/>autolog.aihub.io.kr"] --> N["공통 Nginx · Oracle 80/443"]
     C["차량 앱"] --> N
     N -->|"autolog-api.aihub.io.kr"| A["autolog-api:8080"]
     N -->|"shared-api.example.invalid"| T["기존 app:8000"]
@@ -217,7 +217,7 @@ docker compose exec -T autolog-db sh -c \
 
 | Pages 항목 | 값 |
 | --- | --- |
-| 운영 주소 | `https://autolog-5wr.pages.dev` (Pages 기본 도메인, 커스텀 도메인 없음) |
+| 운영 주소 | `https://autolog.aihub.io.kr` (사용자 도메인, `aihub.io.kr` 영역의 프록시 CNAME → `autolog-5wr.pages.dev`). 기본 도메인 `https://autolog-5wr.pages.dev`도 접속됨 |
 | 운영 브랜치 | `main`, 미리보기 배포 없음 |
 | 빌드 감시 경로 | `dashboard/*` — 이 폴더가 바뀐 푸시만 빌드 |
 | Root directory | `dashboard` |
@@ -227,7 +227,7 @@ docker compose exec -T autolog-db sh -c \
 
 `VITE_API_BASE_URL`은 `/api/v1`까지 포함하며 빌드 시점에 들어갑니다(`dashboard/src/config.ts`). `VITE_*` 값은 브라우저에 공개되므로 비밀값을 넣지 않습니다. `dashboard/vite.config.ts`의 `AUTOLOG_SERVER_URL`은 로컬 개발 프록시 전용입니다.
 
-서버 `.env`의 `CORS_ALLOWED_ORIGINS`에 Pages 주소가 있어야 브라우저 호출이 됩니다(계약 D8). 주소를 바꾸면 서버 `.env`도 고치고 API를 다시 시작합니다.
+서버 `.env`의 `CORS_ALLOWED_ORIGINS`에 두 대시보드 주소가 있어야 브라우저 호출이 됩니다(계약 D8). 주소를 바꾸면 서버 `.env`도 고치고 API를 다시 시작합니다.
 
 차량 앱 release의 서버 주소는 `app/car/build.gradle.kts`의 `API_BASE_URL`(`https://autolog-api.aihub.io.kr`)이고, debug는 에뮬레이터 → 개발 Mac 연결용 `http://10.0.2.2:8080`입니다.
 

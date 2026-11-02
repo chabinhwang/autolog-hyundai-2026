@@ -43,7 +43,7 @@ npm run build    # dist/
 - `VITE_API_BASE_URL`: `/api/v1`까지 포함한 API 주소(빌드 시점 값). 비우면 `/api/v1`로 호출해 개발 서버 프록시를 씁니다. 운영은 `https://autolog-api.aihub.io.kr/api/v1`. 예시는 `dashboard/.env.example`.
 - `AUTOLOG_SERVER_URL`: 개발 서버 프록시 대상. 기본 `http://localhost:8080`.
 - 개발 서버는 `http://localhost:5173`으로 접속합니다. 프록시가 브라우저의 `Origin`을 그대로 넘기므로, 서버 `CORS_ALLOWED_ORIGINS`에 없는 주소(예: `127.0.0.1:5173`)로 열면 403이 납니다.
-- 운영: Cloudflare Pages 프로젝트 `autolog`(`https://autolog-5wr.pages.dev`). main에 `dashboard/` 변경을 푸시하면 자동 배포됩니다. 빌드 설정은 [deploy/README.md](deploy/README.md#cloudflare-pages와-차량-앱).
+- 운영: `https://autolog.aihub.io.kr` (Cloudflare Pages 프로젝트 `autolog`, 기본 도메인 `autolog-5wr.pages.dev`). main에 `dashboard/` 변경을 푸시하면 자동 배포됩니다. 빌드 설정은 [deploy/README.md](deploy/README.md#cloudflare-pages와-차량-앱).
 
 ### 차량 앱
 
