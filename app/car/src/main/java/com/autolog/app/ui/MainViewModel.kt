@@ -21,12 +21,15 @@ import com.autolog.app.purpose.PurposeEstimator
 import com.autolog.app.sync.SyncWorker
 import com.autolog.app.trip.TripRecorderService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,6 +60,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val unconfirmed: StateFlow<List<TripEntity>> = db.tripDao().observeUnconfirmed().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val failedCount: StateFlow<Int> = db.tripDao().observeFailedCount().stateIn(viewModelScope, SharingStarted.Eagerly, 0)
     val pendingCount: StateFlow<Int> = db.tripDao().observePendingCount().stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    /** 화면을 열 때마다 다시 정한다(시계가 바뀌어도 이번 달을 따라간다). */
+    private val month = MutableStateFlow(YearMonth.now(PurposeEstimator.SEOUL))
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val monthSummary: StateFlow<Pair<YearMonth, MonthSummary>> = month.flatMapLatest { m ->
+        val from = m.atDay(1).atStartOfDay(PurposeEstimator.SEOUL).toInstant()
+        val to = m.plusMonths(1).atDay(1).atStartOfDay(PurposeEstimator.SEOUL).toInstant()
+        db.tripDao().observeBetween(from, to).map { m to MonthSummary.of(it) }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, month.value to MonthSummary.Empty)
     val places: StateFlow<List<PlaceEntity>> = db.placeDao().observeActive().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val recorderStatus = container.recorderStatus
 
@@ -73,6 +85,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 앱을 열 때: 페어링돼 있으면 기록 서비스를 띄우고 동기화한다. */
     fun onAppVisible() {
+        month.value = YearMonth.now(PurposeEstimator.SEOUL)
         viewModelScope.launch {
             if (settings.deviceToken() != null) {
                 TripRecorderService.start(getApplication())

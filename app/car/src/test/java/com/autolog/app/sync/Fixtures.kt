@@ -73,6 +73,8 @@ class FakeTripDao : TripDao {
         rows.value.values.filter { it.syncState == SyncState.PENDING && !it.answerPending }.sortedBy { it.startedAt }.take(limit)
     override suspend fun between(from: Instant, to: Instant) =
         rows.value.values.filter { it.startedAt >= from && it.startedAt < to }.sortedBy { it.startedAt }
+    override fun observeBetween(from: Instant, to: Instant): Flow<List<TripEntity>> =
+        rows.map { it.values.filter { t -> t.startedAt >= from && t.startedAt < to }.sortedBy { t -> t.startedAt } }
 
     override suspend fun updatePurpose(uuid: String, purpose: Purpose, source: PurposeSource, category: BusinessCategory?) {
         val t = rows.value[uuid] ?: return

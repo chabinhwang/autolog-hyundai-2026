@@ -41,6 +41,9 @@ interface TripDao {
     @Query("SELECT * FROM trip WHERE startedAt >= :from AND startedAt < :to ORDER BY startedAt")
     suspend fun between(from: Instant, to: Instant): List<TripEntity>
 
+    @Query("SELECT * FROM trip WHERE startedAt >= :from AND startedAt < :to ORDER BY startedAt")
+    fun observeBetween(from: Instant, to: Instant): Flow<List<TripEntity>>
+
     @Query(
         """UPDATE trip SET purpose = :purpose, purposeSource = :source, businessCategory = :category,
            answerPending = 0, localVersion = localVersion + 1 WHERE clientUuid = :uuid""",

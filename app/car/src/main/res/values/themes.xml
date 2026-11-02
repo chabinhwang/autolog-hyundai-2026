@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.AutoLog" parent="android:Theme.Material.NoActionBar" />
+    <!-- Pleos 시스템 UI 라이트 모드(background_secondary)에 맞춘 창 배경. 다크는 values-night. -->
+    <style name="Theme.AutoLog" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/autolog_background</item>
+    </style>
 </resources>

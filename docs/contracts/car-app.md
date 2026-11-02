@@ -41,6 +41,7 @@
 - 출근은 평일 06:00~10:59, 퇴근은 평일 16:00~22:59이며 `Asia/Seoul`을 명시합니다. 주말에는 출퇴근을 추정하지 않습니다. CSV 사용일자·시각도 `Asia/Seoul` 기준입니다.
 - 1차는 등록 장소와 시간대로 추정합니다. NaviHelper는 사용하지 않아 미등록 장소의 서버 전송 라벨은 `null`입니다. 목적지명 연동은 2차입니다.
 - DO(Distraction Optimization) 미선언. 화면은 정차 중에만 쓰고 도착 확인은 음성으로 처리합니다. 플랫폼이 주행 중 화면을 차단하며 앱에는 `CarUxRestrictions` 리스너가 없습니다.
+- 화면은 Pleos Connect 디자인 가이드(https://document.pleos.ai/docs/connect/guide/docs-design/Introduction/intro)의 색 토큰·글자 위계·Basic button·System popup 규격을 따르고, 시스템 라이트/다크 설정을 따릅니다. 앱 창이 1200dp 이상이면 두 단(왼쪽 상태·미확인·동작, 오른쪽 이번 달 요약·최근 운행), 세로(1:1 분할) 창이면 한 단으로 쌓습니다. 이번 달 요약의 업무사용비율은 서버 월간 집계와 같은 (출퇴근 + 업무) ÷ 총 주행거리이며, 음성 확인을 기다리는 트립은 세지 않습니다.
 - `VehicleSource`·`LocationSource`·`VoiceIO` 인터페이스와 Pleos 구현을 유지합니다. Android 표준 TTS·위치 대체 구현은 만들지 않았습니다.
 
 ## 4. 권한·동의

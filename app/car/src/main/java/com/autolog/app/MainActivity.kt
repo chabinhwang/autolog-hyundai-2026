@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +46,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             AutoLogTheme {
-                Surface(Modifier.fillMaxSize()) { AppContent(viewModel) }
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { AppContent(viewModel) }
             }
         }
         requestMissingPermissions()
@@ -115,6 +116,7 @@ private fun Home(viewModel: MainViewModel, onRepair: () -> Unit) {
     val recent by viewModel.recentTrips.collectAsState()
     val places by viewModel.places.collectAsState()
     val consentFor by viewModel.consentFor.collectAsState()
+    val monthSummary by viewModel.monthSummary.collectAsState()
     var picking by remember { mutableStateOf(false) }
     var repairWarning by remember { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
@@ -129,6 +131,8 @@ private fun Home(viewModel: MainViewModel, onRepair: () -> Unit) {
             unconfirmed = unconfirmed,
             recent = recent,
             homeRegistered = places.any { it.type == EndpointType.HOME },
+            month = monthSummary.first,
+            summary = monthSummary.second,
         ),
         actions = HomeActions(
             pickDriver = { picking = true },
