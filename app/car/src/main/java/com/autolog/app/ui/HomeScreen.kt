@@ -46,7 +46,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val DAY = DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN)
-private val TIME = DateTimeFormatter.ofPattern("HH:mm")
 
 /** 두 단 배치를 쓰는 최소 앱 창 너비. Pleos 세로(1:1 분할) 창은 이보다 좁아 한 단으로 쌓는다. */
 private val TwoPaneMinWidth = 1200.dp
@@ -407,12 +406,10 @@ private fun TripRow(trip: TripEntity) {
         Modifier.fillMaxWidth().padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            TIME.format(trip.startedAt.atZone(PurposeEstimator.SEOUL)),
-            style = PleosType.BodyMedium,
-            color = AutoLogColors.textTertiary,
-            modifier = Modifier.width(96.dp),
-        )
+        Column(Modifier.width(184.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(TripTime.range(trip.startedAt, trip.endedAt), style = PleosType.BodyMedium, color = AutoLogColors.textSecondary, maxLines = 1)
+            Text(TripTime.duration(trip.startedAt, trip.endedAt), style = PleosType.BodySmall, color = AutoLogColors.textTertiary, maxLines = 1)
+        }
         Box(Modifier.width(8.dp).height(60.dp).background(AutoLogColors.purpose(trip.purpose), RoundedCornerShape(4.dp)))
         Spacer(Modifier.width(24.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -444,8 +441,8 @@ private fun rememberNewestFirstListState(newestKey: String?): LazyListState {
 }
 
 private fun whenLabel(trip: TripEntity): String {
-    val start = trip.startedAt.atZone(PurposeEstimator.SEOUL)
-    return "${DAY.format(start)} ${TIME.format(start)}"
+    val day = DAY.format(trip.startedAt.atZone(PurposeEstimator.SEOUL))
+    return "$day ${TripTime.range(trip.startedAt, trip.endedAt)} · ${TripTime.duration(trip.startedAt, trip.endedAt)}"
 }
 
 private fun route(trip: TripEntity): String {
