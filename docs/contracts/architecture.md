@@ -47,7 +47,7 @@
 | 서버 | 차량 앱·대시보드 | 수집·보호. 회사별 데이터 분리, 자동값 보호, 개인 운행 마스킹, 서식 생성 |
 | 대시보드 | 회사 관리자(회사당 1명) | 조회·관리. 업무비율 확인, 기준정보 관리, 기록부 내보내기 |
 
-배포 세부(운영 Compose 프로젝트 `autolog`, 공통 Nginx 연결, `/nginx-health`)는 루트 [README](../../README.md#oracle-배포-연결)를 따릅니다.
+운영 대시보드는 `https://autolog.aihub.io.kr`, Pages 기본 도메인은 `https://autolog-5wr.pages.dev`, API는 `https://autolog-api.aihub.io.kr`입니다 (**확인됨 2026-11-02**). Oracle의 같은 Compose 프로젝트 `autolog`에서 API·PostgreSQL을 운영하며, 공통 Nginx가 `shared-proxy`로 API에 연결합니다. 배포 설정·확인 결과는 [§7](#7-운영-도메인자동-배포), 세부 절차는 [배포 안내](../../deploy/README.md)를 따릅니다.
 
 ## 2. 데이터 흐름
 
@@ -154,7 +154,7 @@ src/
 └── components/
 ```
 
-- Cloudflare Pages에 정적 배포. 로컬 개발은 Vite 프록시로 `localhost:8080`
+- Cloudflare Pages 프로젝트 `autolog`, 운영 `https://autolog.aihub.io.kr` (기본 도메인 `https://autolog-5wr.pages.dev`). GitHub main의 `dashboard/*` 변경 푸시로 자동 배포하며 미리보기 배포는 없음 (**확인됨 2026-11-02**). 로컬 개발은 Vite 프록시로 `localhost:8080`
 
 ## 4. 설계 원칙
 
@@ -227,3 +227,27 @@ src/
 온디바이스 STT 오류·오인식과 "네, 맞아요"에서도 발생한 SIGSEGV는 **확인됨 (2026-11-02, 누적 약 12회 중 3회)**. 긴 응답은 짧은 "업무" 오인식을 줄이는 권장이며 크래시 방지는 보장하지 않습니다. 응답 전체 '너무' 보정·재질문 범위는 [car-app §3](car-app.md#3-음성용도-추정주행-제한)을 따릅니다.
 
 모두 차량 앱 내부 구현에만 영향이 있고, 서버·대시보드 구조와 API 계약은 바뀌지 않습니다.
+
+## 7. 운영 도메인·자동 배포
+
+다음 설정·대시보드 응답은 **확인됨 (2026-11-02)**. 푸시는 사용자가 담당하며 로컬 문서 커밋만으로 운영 배포가 실행되지는 않습니다.
+
+| 항목 | 확정 설정 |
+| --- | --- |
+| 대시보드 | `https://autolog.aihub.io.kr`, `aihub.io.kr`의 프록시 CNAME → `autolog-5wr.pages.dev`. 사용자 도메인·기본 도메인 모두 HTTP 200 확인 |
+| Pages | 프로젝트 `autolog`, GitHub 연동, main·`dashboard/*` 변경 감시, 미리보기 배포 없음 |
+| Pages 빌드 | 루트 `dashboard`, `npm ci && npm run build`, 출력 `dist`, `NODE_VERSION=22` |
+| 대시보드 API | 빌드 시 `VITE_API_BASE_URL=https://autolog-api.aihub.io.kr/api/v1` |
+| API·DB | Oracle `~/autolog-hyundai-2026`, Docker Compose의 API·PostgreSQL. 공통 Nginx·인증서는 별도 공통 리포가 관리 |
+| 서버 자동 배포 | GitHub Actions 「AutoLog API build and deploy」 활성, `AUTOLOG_DEPLOY_ENABLED=true`. main의 `server/`·`deploy/` 변경 푸시 → 서버 테스트 → ARM64 이미지 GHCR 발행 → Oracle 배포 → 공개 health 확인 |
+| 서버 설정 | Oracle `.env` 준비 완료. DB 비밀번호·JWT 키는 새로 생성해 서버에서 관리 |
+| CORS (D8) | `https://autolog.aihub.io.kr`, `https://autolog-5wr.pages.dev`, `http://localhost:5173` |
+
+서버 배포·대시보드 설정의 원본은 [deploy/README.md](../../deploy/README.md), 환경변수 계약은 [config.md](config.md)입니다.
+
+### 첫 배포·503 해결 확인
+
+- 기존 API 503 원인은 API가 한 번도 배포되지 않은 것이었습니다. 최초 점검 때 Oracle 배포 폴더·GHCR 이미지가 없었고, 11월 1일 Actions 실행은 이미지 빌드 중 취소된 뒤 워크플로가 비활성 상태였습니다. 공통 Nginx의 `/nginx-health` 200은 API 배포 완료를 의미하지 않습니다 (**확인됨 2026-11-02**).
+- 사용자 결정으로 워크플로·배포 변수를 활성화한 후, 커밋 `e45479c`의 [첫 서버 배포 런 41365572745](https://github.com/chabinhwang/autolog-hyundai-2026/actions/runs/41365572745)가 `build`·`deploy` 모두 성공했습니다.
+- `gh run view 41365572745`와 공개 health를 직접 확인했습니다. `https://autolog-api.aihub.io.kr/actuator/health`는 HTTP 200·`status: UP`, `/nginx-health`도 HTTP 200으로 **기존 503 해결 확인됨 (2026-11-02 09:15 KST)**.
+- 대시보드 사용자 도메인·Pages 기본 도메인 모두 HTTP 200 확인. release 차량 앱의 실제 운영 API 연동과 개인정보처리방침·위치정보 이용약관 페이지 게시 여부는 이 health 확인과 별도입니다.
