@@ -213,24 +213,23 @@ docker compose exec -T autolog-db sh -c \
 
 ## Cloudflare Pages와 차량 앱
 
-대시보드는 이 리포를 Pages Git 연동으로 배포합니다.
+대시보드는 Cloudflare Pages 프로젝트 `autolog`가 이 리포를 GitHub 연동으로 빌드합니다 (2026-11-02 생성).
 
 | Pages 항목 | 값 |
 | --- | --- |
+| 운영 주소 | `https://autolog-5wr.pages.dev` (Pages 기본 도메인, 커스텀 도메인 없음) |
+| 운영 브랜치 | `main`, 미리보기 배포 없음 |
+| 빌드 감시 경로 | `dashboard/*` — 이 폴더가 바뀐 푸시만 빌드 |
 | Root directory | `dashboard` |
-| Build command | `npm run build` |
+| Build command | `npm ci && npm run build` |
 | Output directory | `dist` |
-| 운영 API origin | `https://autolog-api.aihub.io.kr` |
+| 환경변수 | `NODE_VERSION=22`, `VITE_API_BASE_URL=https://autolog-api.aihub.io.kr/api/v1` |
 
-현재 `dashboard/vite.config.ts`의 `AUTOLOG_SERVER_URL`은 **로컬 개발 proxy**용입니다. Pages에서는 이 proxy가 실행되지 않습니다. 현재 health 코드는 `/actuator/health` 상대 주소를 사용하므로, Pages 배포 전에는 `VITE_API_BASE_URL` 같은 빌드 환경변수로 운영 origin을 읽도록 클라이언트 코드를 연결해야 합니다. 변수 이름과 값만 Pages에 등록해도 기존 코드가 자동으로 바뀌지는 않습니다.
+`VITE_API_BASE_URL`은 `/api/v1`까지 포함하며 빌드 시점에 들어갑니다(`dashboard/src/config.ts`). `VITE_*` 값은 브라우저에 공개되므로 비밀값을 넣지 않습니다. `dashboard/vite.config.ts`의 `AUTOLOG_SERVER_URL`은 로컬 개발 프록시 전용입니다.
 
-예를 들어 `VITE_API_BASE_URL=https://autolog-api.aihub.io.kr`로 정하면 일반 API는 `/api/v1/...`, health는 `/actuator/health`를 붙입니다. Vite의 `VITE_*` 값은 브라우저에 공개되므로 DB 비밀번호·JWT 서명 키를 넣지 않습니다.
+서버 `.env`의 `CORS_ALLOWED_ORIGINS`에 Pages 주소가 있어야 브라우저 호출이 됩니다(계약 D8). 주소를 바꾸면 서버 `.env`도 고치고 API를 다시 시작합니다.
 
-서버는 계약 문서의 `CORS_ALLOWED_ORIGINS`를 읽어 실제 Pages origin을 허용해야 합니다. 현재는 환경변수 전달만 준비되어 있습니다. 메서드는 GET·POST·PUT·PATCH·DELETE, 헤더 Authorization·Content-Type, 쿠키 자격 증명 없음이 계약입니다. 이후 인증 필터를 추가할 때 preflight OPTIONS와 `/actuator/health` 처리도 확인하세요.
-
-차량 앱의 운영 base URL은 `https://autolog-api.aihub.io.kr/api/v1`입니다. debug의 `10.0.2.2` 주소는 에뮬레이터 → 개발 Mac 연결용으로 따로 유지합니다.
-
-차량 앱의 실제 release URL 분리도 클라이언트 구현에서 반영해야 합니다. 이 배포 설정이 Android의 BuildConfig를 자동 변경하지는 않습니다.
+차량 앱 release의 서버 주소는 `app/car/build.gradle.kts`의 `API_BASE_URL`(`https://autolog-api.aihub.io.kr`)이고, debug는 에뮬레이터 → 개발 Mac 연결용 `http://10.0.2.2:8080`입니다.
 
 ## 검증과 참고
 

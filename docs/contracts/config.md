@@ -14,7 +14,7 @@
 | `PORT` | | `8080` | 기본 8080. 컨테이너 내부 수신 포트 |
 | `JWT_SECRET` | O | (비밀, 32바이트 이상) | 관리자 JWT HS256 서명 키. 짧으면 서버 시작 실패 |
 | `JWT_EXPIRES_HOURS` | | `12` | 기본 12 (D1) |
-| `CORS_ALLOWED_ORIGINS` | O | `https://autolog-dashboard.pages.dev,http://localhost:5173` | 쉼표 구분. 대시보드 Pages 도메인 미정 (D8) |
+| `CORS_ALLOWED_ORIGINS` | O | `https://autolog-5wr.pages.dev,http://localhost:5173` | 쉼표 구분. 운영 대시보드 Pages 도메인 (D8) |
 | `SEED_ORG_NAME` | | `오토로그 주식회사` | 시드 회사 상호명 |
 | `SEED_BIZ_REG_NO` | | `123-45-67890` | 시드 회사 사업자등록번호 |
 | `SEED_ADMIN_LOGIN_ID` | | `admin@autolog-demo.kr` | 시드 관리자 아이디 (이메일 형식) |
