@@ -8,6 +8,7 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -107,13 +108,20 @@ class PleosVoiceIO(
                 finished.complete(false)
             }
         }
-        withContext(Dispatchers.Main) {
-            engine.addEventListener(listener)
-            engine.speak(text, true)
+        var done = false
+        try {
+            withContext(Dispatchers.Main) {
+                engine.addEventListener(listener)
+                engine.speak(text, true)
+            }
+            return (withTimeoutOrNull(SPEAK_TIMEOUT_MS) { finished.await() } ?: false).also { done = true }
+        } finally {
+            // 도착 질문 팝업에서 버튼을 누르면 읽던 질문을 끊는다(취소).
+            withContext(NonCancellable + Dispatchers.Main) {
+                if (!done) engine.stop()
+                engine.removeEventListener(listener)
+            }
         }
-        val result = withTimeoutOrNull(SPEAK_TIMEOUT_MS) { finished.await() } ?: false
-        withContext(Dispatchers.Main) { engine.removeEventListener(listener) }
-        return result
     }
 
     private suspend fun sttReady(): SpeechToText? = stt ?: withContext(Dispatchers.Main) {
@@ -158,17 +166,21 @@ class PleosVoiceIO(
                 collector.onFailure()
             }
         }
-        withContext(Dispatchers.Main) {
-            engine.addListener(listener)
-            engine.request()
-        }
         val pcm = retryDebugPcm ?: debugAudio?.invoke()
         retryDebugPcm = null
-        pcm?.let { injectAudio(engine, it) }
-        val text = collector.await(timeoutMs, GRACE_AFTER_SEGMENT_MS)
-        withContext(Dispatchers.Main) {
-            engine.stop()
-            engine.removeListener(listener)
+        val text = try {
+            withContext(Dispatchers.Main) {
+                engine.addListener(listener)
+                engine.request()
+            }
+            pcm?.let { injectAudio(engine, it) }
+            collector.await(timeoutMs, GRACE_AFTER_SEGMENT_MS)
+        } finally {
+            // 팝업 버튼으로 취소돼도 녹음을 멈춘다.
+            withContext(NonCancellable + Dispatchers.Main) {
+                engine.stop()
+                engine.removeListener(listener)
+            }
         }
         return when {
             text != null -> ListenResult.Heard(text)

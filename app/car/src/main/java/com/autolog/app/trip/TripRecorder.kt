@@ -6,23 +6,29 @@ import com.autolog.app.data.settings.OngoingTrip
 import com.autolog.app.data.settings.PairedVehicleInfo
 import com.autolog.app.domain.BusinessCategory
 import com.autolog.app.domain.DetectedTrip
+import com.autolog.app.domain.Endpoint
 import com.autolog.app.domain.GeoPoint
 import com.autolog.app.domain.Purpose
 import com.autolog.app.domain.VehicleSnapshot
 import com.autolog.app.location.LocationSource
+import com.autolog.app.purpose.ArrivalChoice
 import com.autolog.app.purpose.PlaceMatcher
 import com.autolog.app.purpose.PurposeDecision
+import com.autolog.app.purpose.PurposeEstimate
 import com.autolog.app.purpose.PurposeEstimator
 import com.autolog.app.purpose.VoiceAnswerParser
 import com.autolog.app.vehicle.VehicleSource
 import com.autolog.app.voice.ListenResult
 import com.autolog.app.voice.VoiceIO
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
@@ -39,7 +45,7 @@ interface RecorderSettings {
 
 /**
  * 트립 기록 흐름 (architecture.md 2절 ②):
- * 기어·Odometer·위치 → [TripDetector] → 장소·용도 판정 → 미확인으로 먼저 저장 → 음성 확인 → 결과 반영 → 동기화 요청.
+ * 기어·Odometer·위치 → [TripDetector] → 장소·용도 판정 → 미확인으로 먼저 저장 → 음성·팝업 확인 → 결과 반영 → 동기화 요청.
  * Foreground Service가 [start]를 호출한다.
  */
 class TripRecorder(
@@ -50,6 +56,7 @@ class TripRecorder(
     private val settings: RecorderSettings,
     private val requestSync: () -> Unit,
     private val parkConfirm: Duration,
+    private val taps: ArrivalTaps = ArrivalTaps(),
     private val clock: Clock = Clock.systemUTC(),
     private val tickMs: Long = 2_000,
     private val answerTimeoutMs: Long = 10_000,
@@ -57,8 +64,11 @@ class TripRecorder(
     /** 화면 표시용 단계. 주행 중엔 플랫폼이 화면을 가리므로 정차 후 단계(PARKED·ASKING)를 보여주는 게 핵심이다. */
     enum class Phase { IDLE, DRIVING, PARKED, ASKING }
 
-    /** 화면 표시용 상태. [prompt]는 도착 질문 중일 때 읽어 준 문장(화면에도 같이 띄운다). */
-    data class Status(val phase: Phase, val lastMessage: String?, val prompt: String? = null) {
+    /**
+     * 화면 표시용 상태. [prompt]는 도착 질문 중일 때 읽어 준 문장(팝업에도 같이 띄운다).
+     * [suggested]는 추정 용도(미확인이면 null). 팝업에서 그 버튼을 '네, ○○'로 강조한다.
+     */
+    data class Status(val phase: Phase, val lastMessage: String?, val prompt: String? = null, val suggested: Purpose? = null) {
         val driving: Boolean get() = phase != Phase.IDLE
 
         companion object {
@@ -131,15 +141,36 @@ class TripRecorder(
             }
             is TripRepository.RecordResult.Saved -> {
                 val prompt = PurposeEstimator.arrivalPrompt(dest, trip.distanceKm, estimate)
-                _status.value = Status(Phase.ASKING, lastMessage = null, prompt = prompt)
-                voice.speak(prompt)
-                val decision = VoiceAnswerParser.resolve(estimate, listenWithRetry())
-                repository.applyVoiceDecision(result.trip.clientUuid, decision)
+                taps.clear()
+                _status.value = Status(
+                    Phase.ASKING,
+                    lastMessage = null,
+                    prompt = prompt,
+                    suggested = estimate.purpose.takeIf { it != Purpose.UNCONFIRMED },
+                )
+                val decision = askArrival(prompt, estimate, dest)
+                repository.applyArrivalDecision(result.trip.clientUuid, decision)
                 val message = confirmation(decision)
                 _status.value = Status(Phase.IDLE, message)
                 voice.speak(message)
                 requestSync()
             }
+        }
+    }
+
+    /**
+     * 음성 대답과 팝업 버튼을 동시에 받고 먼저 들어온 쪽으로 정한다 (car-app.md §3).
+     * 버튼을 누르면 읽기·듣기를 멈춘다. 음성이 무응답·해석 불가로 끝나면 미확인이고 팝업도 닫힌다.
+     */
+    private suspend fun askArrival(prompt: String, estimate: PurposeEstimate, dest: Endpoint): PurposeDecision = coroutineScope {
+        val byVoice = async {
+            voice.speak(prompt)
+            VoiceAnswerParser.resolve(estimate, listenWithRetry())
+        }
+        val byTap = async { taps.receive().decide(estimate, dest) }
+        select {
+            byVoice.onAwait { decision -> byTap.cancel(); decision }
+            byTap.onAwait { decision -> byVoice.cancel(); decision }
         }
     }
 

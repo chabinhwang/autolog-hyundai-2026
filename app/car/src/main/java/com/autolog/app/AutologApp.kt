@@ -49,6 +49,9 @@ class AppContainer(context: Context) {
     /** 기록 서비스가 알려주는 상태. 화면에서 주행 중 여부·마지막 안내를 보여준다. */
     val recorderStatus = kotlinx.coroutines.flow.MutableStateFlow(com.autolog.app.trip.TripRecorder.Status.Idle)
 
+    /** 도착 질문 팝업에서 누른 버튼. 화면이 보내고 기록 서비스가 받는다. */
+    val arrivalTaps = com.autolog.app.trip.ArrivalTaps()
+
     val tripRepository = TripRepository(database.tripDao(), database.tripEditDao(), database.placeDao())
     val consentRepository = ConsentRepository(database.consentDao(), settings)
 

@@ -92,8 +92,8 @@ class TripRepository(
         }
     }
 
-    /** 도착 음성 확인 결과 반영. 무응답이면 미확인(AUTO) 그대로 업로드 대상이 된다. */
-    suspend fun applyVoiceDecision(uuid: String, decision: PurposeDecision) {
+    /** 도착 확인(음성 대답 또는 팝업 버튼) 결과 반영. 무응답·'나중에'면 미확인(AUTO) 그대로 업로드 대상이 된다. */
+    suspend fun applyArrivalDecision(uuid: String, decision: PurposeDecision) {
         tripDao.updatePurpose(uuid, decision.purpose, decision.source, decision.businessCategory)
     }
 

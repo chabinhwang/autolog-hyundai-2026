@@ -25,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.autolog.app.domain.EndpointType
 import com.autolog.app.pairing.PairingController
+import com.autolog.app.trip.TripRecorder
+import com.autolog.app.ui.ArrivalDialog
 import com.autolog.app.ui.AutoLogTheme
 import com.autolog.app.ui.ConsentDialog
 import com.autolog.app.ui.DriverPickerDialog
@@ -163,5 +165,9 @@ private fun Home(viewModel: MainViewModel, onRepair: () -> Unit) {
             },
             onDismiss = { repairWarning = -1 },
         )
+    }
+    // 도착 질문은 다른 팝업 위에 띄운다(음성과 함께 답을 받는 중). 마지막에 그려야 위에 온다.
+    status.prompt?.takeIf { status.phase == TripRecorder.Phase.ASKING }?.let { prompt ->
+        ArrivalDialog(prompt, status.suggested, viewModel::answerArrival)
     }
 }

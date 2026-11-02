@@ -26,6 +26,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.autolog.app.data.local.DriverEntity
+import com.autolog.app.domain.Purpose
+import com.autolog.app.purpose.ArrivalChoice
 
 /** 이용자 선택. 공용차는 탈 때마다 고른다(기본값: 마지막 사용자). */
 @Composable
@@ -107,6 +109,51 @@ private fun Item(title: String, body: String) {
         Text(title, style = PleosType.BodyMediumStrong, color = AutoLogColors.text)
         Text(body, style = PleosType.BodyMedium, color = AutoLogColors.textSecondary)
     }
+}
+
+/**
+ * 도착 질문 팝업 (car-app.md §3). 음성으로 묻는 동안 같은 질문을 띄우고, 말하거나 버튼을 누르는 것 중 먼저 들어온 답으로 기록한다.
+ * 정차(P) 확인 뒤에만 뜨므로 화면 조작이 가능하다. 바깥을 눌러도 닫지 않는다(음성 무응답이면 기록 서비스가 닫는다).
+ */
+@Composable
+fun ArrivalDialog(prompt: String, suggested: Purpose?, onChoose: (ArrivalChoice) -> Unit) {
+    PleosPopup(
+        title = "도착했어요",
+        description = prompt,
+        onDismiss = {},
+        large = true,
+        dismiss = "나중에 고를게요" to { onChoose(ArrivalChoice.LATER) },
+    ) {
+        Text("말로 대답하거나 아래에서 골라 주세요.", style = PleosType.BodySmall, color = AutoLogColors.textTertiary)
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ArrivalButton("출퇴근", Purpose.COMMUTE, suggested, AutoLogColors.autonomous) { onChoose(ArrivalChoice.COMMUTE) }
+            ArrivalButton("업무", Purpose.BUSINESS, suggested, AutoLogColors.positive) { onChoose(ArrivalChoice.BUSINESS) }
+            ArrivalButton("개인", Purpose.PERSONAL, suggested, null) { onChoose(ArrivalChoice.PERSONAL) }
+        }
+    }
+}
+
+/** 추정 용도 버튼은 '네, ○○'로 채워서 강조한다(음성 "네"와 같은 뜻). */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.ArrivalButton(
+    label: String,
+    purpose: Purpose,
+    suggested: Purpose?,
+    tint: Color?,
+    onClick: () -> Unit,
+) {
+    val isSuggested = purpose == suggested
+    PleosButton(
+        label = if (isSuggested) "네, $label" else label,
+        onClick = onClick,
+        modifier = Modifier.weight(1f),
+        size = ButtonSize.Large,
+        style = when {
+            isSuggested -> ButtonStyle.Filled
+            tint != null -> ButtonStyle.Tinted(tint)
+            else -> ButtonStyle.Basic
+        },
+    )
 }
 
 /** 재페어링 전 미전송 경고 (D10). */

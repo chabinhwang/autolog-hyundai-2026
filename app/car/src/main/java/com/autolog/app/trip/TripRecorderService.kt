@@ -52,6 +52,7 @@ class TripRecorderService : Service() {
             settings = container.settings,
             requestSync = { SyncWorker.requestNow(this) },
             parkConfirm = Duration.ofSeconds(BuildConfig.PARK_CONFIRM_SECONDS.toLong()),
+            taps = container.arrivalTaps,
         )
         recorder.start(scope)
         scope.launch {

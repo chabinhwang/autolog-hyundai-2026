@@ -180,7 +180,7 @@ private fun StatusCard(status: TripRecorder.Status, modifier: Modifier = Modifie
         TripRecorder.Phase.IDLE -> PhaseLook("운행 대기 중", "기어를 D로 바꾸면 자동으로 기록해요.", 0)
         TripRecorder.Phase.DRIVING -> PhaseLook("운행 기록 중", "도착해서 P에 세우면 용도를 한 번 물어볼게요.", 1)
         TripRecorder.Phase.PARKED -> PhaseLook("정차 확인 중", "P로 잠시 서 있으면 운행을 마무리해요. 바로 다시 출발하면 같은 운행으로 이어져요.", 2)
-        TripRecorder.Phase.ASKING -> PhaseLook("도착 확인 중", "대답을 듣고 있어요. \"네\" 또는 \"업무\"·\"개인\"처럼 말해 주세요.", 3)
+        TripRecorder.Phase.ASKING -> PhaseLook("도착 확인 중", "말로 대답하거나(\"네\"·\"업무\"·\"개인\") 화면에서 골라 주세요.", 3)
     }
     val accent = when (status.phase) {
         TripRecorder.Phase.IDLE -> colors.personal

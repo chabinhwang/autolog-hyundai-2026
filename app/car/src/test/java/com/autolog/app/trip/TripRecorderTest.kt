@@ -10,6 +10,7 @@ import com.autolog.app.domain.GeoPoint
 import com.autolog.app.domain.Purpose
 import com.autolog.app.domain.PurposeSource
 import com.autolog.app.location.LocationSource
+import com.autolog.app.purpose.ArrivalChoice
 import com.autolog.app.sync.FakeEditDao
 import com.autolog.app.sync.FakePlaceDao
 import com.autolog.app.sync.FakeTripDao
@@ -107,7 +108,7 @@ class TripRecorderTest {
     @After
     fun tearDown() = scope.cancel()
 
-    private fun recorder(voice: VoiceIO, settings: RecorderSettings): TripRecorder {
+    private fun recorder(voice: VoiceIO, settings: RecorderSettings, taps: ArrivalTaps = ArrivalTaps()): TripRecorder {
         runBlocking {
             places.upsert(PlaceEntity(0, 1, "본사", EndpointType.COMPANY, COMPANY.lat, COMPANY.lng, 200, false))
             places.upsert(PlaceEntity(0, null, "집", EndpointType.HOME, HOME.lat, HOME.lng, 200, false))
@@ -117,7 +118,7 @@ class TripRecorderTest {
             vehicle = vehicle, location = location, voice = voice,
             repository = TripRepository(trips, FakeEditDao(), places, clock),
             settings = settings, requestSync = { syncRequests++ },
-            parkConfirm = Duration.ofMillis(300), clock = clock, tickMs = 50, answerTimeoutMs = 100,
+            parkConfirm = Duration.ofMillis(300), taps = taps, clock = clock, tickMs = 50, answerTimeoutMs = 100,
         )
     }
 
@@ -234,6 +235,61 @@ class TripRecorderTest {
         withTimeout(2_000) { while (voice.spoken.size < 3) delay(20) }
         assertEquals("미확인으로 남겨 둘게요. 정차 중에 화면에서 골라 주세요.", voice.spoken[2])
         assertEquals(2, voice.listens)
+    }
+
+    @Test
+    fun `질문 중 팝업에서 업무를 누르면 음성 대답을 기다리지 않고 화면 선택으로 확정한다`() = runBlocking {
+        val voice = FakeVoice("응").apply { listenDelayMs = 3_000 }
+        val taps = ArrivalTaps()
+        val recorder = recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)), taps)
+        recorder.start(scope)
+        delay(200)
+
+        drive(100.0, 112.4, COMPANY)
+
+        val asking = withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.ASKING } }
+        assertEquals(Purpose.COMMUTE, asking.suggested)
+        taps.send(ArrivalChoice.BUSINESS)
+
+        val saved = withTimeout(1_500) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(Purpose.BUSINESS, saved.purpose)
+        assertEquals(PurposeSource.MANUAL, saved.purposeSource)
+        withTimeout(1_500) { while (voice.spoken.size < 2) delay(20) }
+        assertEquals("업무로 기록했어요.", voice.spoken[1])
+        val done = withTimeout(1_500) { recorder.status.first { it.phase == TripRecorder.Phase.IDLE } }
+        assertEquals("업무로 기록했어요.", done.lastMessage)
+    }
+
+    @Test
+    fun `팝업에서 나중에를 누르면 미확인으로 남긴다`() = runBlocking {
+        val voice = FakeVoice("응").apply { listenDelayMs = 3_000 }
+        val taps = ArrivalTaps()
+        val recorder = recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)), taps)
+        recorder.start(scope)
+        delay(200)
+
+        drive(100.0, 112.4, COMPANY)
+
+        withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.ASKING } }
+        taps.send(ArrivalChoice.LATER)
+
+        val saved = withTimeout(1_500) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(Purpose.UNCONFIRMED, saved.purpose)
+        assertEquals(PurposeSource.AUTO, saved.purposeSource)
+    }
+
+    @Test
+    fun `질문 전에 눌러 둔 버튼은 다음 질문에 쓰지 않는다`() = runBlocking {
+        val voice = FakeVoice("응")
+        val taps = ArrivalTaps().apply { send(ArrivalChoice.PERSONAL) }
+        recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)), taps).start(scope)
+        delay(200)
+
+        drive(100.0, 112.4, COMPANY)
+
+        val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(Purpose.COMMUTE, saved.purpose)
+        assertEquals(PurposeSource.VOICE, saved.purposeSource)
     }
 
     @Test

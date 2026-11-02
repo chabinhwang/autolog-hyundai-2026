@@ -17,6 +17,7 @@ import com.autolog.app.domain.Purpose
 import com.autolog.app.export.CsvExporter
 import com.autolog.app.location.PleosLocationSource
 import com.autolog.app.pairing.PairingController
+import com.autolog.app.purpose.ArrivalChoice
 import com.autolog.app.purpose.PurposeEstimator
 import com.autolog.app.sync.SyncWorker
 import com.autolog.app.trip.TripRecorderService
@@ -142,6 +143,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             container.tripRepository.changePurpose(trip.clientUuid, purpose, category)
             SyncWorker.requestNow(getApplication())
         }
+    }
+
+    /** 도착 질문 팝업에서 고른 답. 기록 서비스가 음성 대답보다 먼저 받으면 이것으로 확정한다. */
+    fun answerArrival(choice: ArrivalChoice) {
+        container.arrivalTaps.send(choice)
     }
 
     /** 지금 위치를 집으로 등록한다. 집 위치는 차량 안에만 저장한다(D2). */
