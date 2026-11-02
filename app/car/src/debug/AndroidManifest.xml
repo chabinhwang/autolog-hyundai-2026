@@ -2,6 +2,9 @@
 <!-- debug 빌드 전용: 에뮬레이터에서 로컬 서버(10.0.2.2)로 HTTP 연결 허용, 플랫폼 점검 화면 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- NaviHelper 주소 조회 점검용(ProbeActivity). release에는 아직 선언하지 않는다. -->
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+
     <application android:networkSecurityConfig="@xml/network_security_config_debug">
         <activity
             android:name=".probe.ProbeActivity"

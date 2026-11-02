@@ -3,6 +3,11 @@ package com.autolog.app.probe
 import ai.pleos.playground.location.fused.FusedLocation
 import ai.pleos.playground.location.fused.listener.FusedLocationListener
 import ai.pleos.playground.location.fused.model.LocationData
+import ai.pleos.playground.navi.constants.NaviErrorCode
+import ai.pleos.playground.navi.data.CurrentLocationInfo
+import ai.pleos.playground.navi.data.DestinationInfo
+import ai.pleos.playground.navi.helper.NaviHelper
+import ai.pleos.playground.navi.helper.listener.NaviHelperEventListener
 import ai.pleos.playground.stt.SpeechToText
 import ai.pleos.playground.stt.listener.ResultListener
 import ai.pleos.playground.tts.TextToSpeech
@@ -48,6 +53,8 @@ class ProbeActivity : ComponentActivity() {
     private var fusedLocation: FusedLocation? = null
     private var tts: TextToSpeech? = null
     private var stt: SpeechToText? = null
+    private var navi: NaviHelper? = null
+    private var naviConnected = false
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
@@ -67,6 +74,7 @@ class ProbeActivity : ComponentActivity() {
                             Button(onClick = ::probeTts) { Text("TTS") }
                             Button(onClick = ::probeStt) { Text("STT") }
                             Button(onClick = ::probeNetwork) { Text("네트워크") }
+                            Button(onClick = ::probeNavi) { Text("내비") }
                         }
                         LazyColumn(Modifier.padding(top = 12.dp)) {
                             items(logs) { Text(it, style = MaterialTheme.typography.bodyLarge) }
@@ -95,6 +103,7 @@ class ProbeActivity : ComponentActivity() {
                 "stt" -> probeStt()
                 "network" -> probeNetwork()
                 "sttfile" -> probeSttFile()
+                "navi" -> probeNavi()
                 else -> log("알 수 없는 점검 항목: $name")
             }
         }
@@ -253,7 +262,43 @@ class ProbeActivity : ComponentActivity() {
         }
     }
 
+    /** NaviHelper로 현재 위치 주소·목적지를 받아 오는지 확인한다(출발·도착 동 이름 표시 검토용). */
+    private fun probeNavi() {
+        val helper = navi
+        if (helper != null && naviConnected) {
+            requestNaviInfo(helper)
+            return
+        }
+        val created = helper ?: NaviHelper(applicationContext).also { navi = it }
+        created.initialize(
+            onConnected = {
+                naviConnected = true
+                log("NaviHelper 연결됨")
+                created.addListener(object : NaviHelperEventListener {
+                    override fun onCurrentLocationInfo(currentLocationInfo: CurrentLocationInfo) =
+                        log("현재 위치 주소: '${currentLocationInfo.address}' (${currentLocationInfo.latitude}, ${currentLocationInfo.longitude})")
+
+                    override fun onDestinationInfo(destinationInfo: DestinationInfo) =
+                        log("목적지: '${destinationInfo.name}' / '${destinationInfo.address}'")
+
+                    override fun onError(errorCode: NaviErrorCode) = log("NaviHelper 오류: $errorCode")
+                })
+                requestNaviInfo(created)
+            },
+            onFailed = { log("NaviHelper 연결 실패: ${it.javaClass.simpleName} ${it.message}") },
+        )
+    }
+
+    private fun requestNaviInfo(helper: NaviHelper) {
+        log("현재 위치·목적지 요청")
+        runCatching {
+            helper.getCurrentLocationInfo()
+            helper.getDestinationInfo()
+        }.onFailure { log("요청 실패: ${it.javaClass.simpleName} ${it.message}") }
+    }
+
     override fun onDestroy() {
+        navi?.release()
         tts?.release()
         stt?.release()
         fusedLocation?.release()
