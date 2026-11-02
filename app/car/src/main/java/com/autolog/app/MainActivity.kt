@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -87,12 +88,16 @@ private fun AppContent(viewModel: MainViewModel) {
         if (pairingState is PairingController.State.Paired) repairing = false
     }
 
+    val cancelRepair = { viewModel.pairing.cancel(); repairing = false }
+    // 다시 등록 중 시스템 뒤로가기는 '취소'와 같다(앱을 닫지 않고 홈으로).
+    BackHandler(enabled = repairing && paired == true, onBack = cancelRepair)
+
     when {
         paired == null -> Unit
         paired == false || repairing -> PairingScreen(
             state = pairingState,
             onStart = viewModel::startPairing,
-            onCancel = if (repairing) ({ viewModel.pairing.cancel(); repairing = false }) else null,
+            onCancel = if (repairing) cancelRepair else null,
         )
         else -> Home(viewModel, onRepair = { repairing = true; viewModel.startPairing() })
     }
