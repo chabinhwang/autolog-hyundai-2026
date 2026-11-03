@@ -4,7 +4,9 @@ import { fetchDrivers } from '../api/drivers'
 import { editTrip, fetchTrip } from '../api/trips'
 import type { BusinessCategory, Driver, EditValue, Purpose, TripDetail, TripEditChanges } from '../api/types'
 import { Alert } from '../components/Alert'
+import { Icon } from '../components/Icon'
 import { LoadingState } from '../components/LoadingState'
+import { PageHeader } from '../components/PageHeader'
 import { useApiData } from '../hooks/useApiData'
 import { monthRange } from '../lib/dates'
 import { errorMessage } from '../lib/errors'
@@ -55,9 +57,10 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
   if (!detail) {
     return (
       <section>
-        <p>
-          <Link to="/trips">← 운행 기록</Link>
-        </p>
+        <Link to="/trips" className="back-link">
+          <Icon name="arrowLeft" size={16} />
+          운행 기록
+        </Link>
         <LoadingState loading={trip.loading} error={trip.error} onRetry={isApiError(trip.error, 'TRIP_NOT_FOUND') ? undefined : trip.reload} />
       </section>
     )
@@ -68,14 +71,32 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
 
   return (
     <section aria-labelledby="trip-title">
-      <p>
-        <Link to={backLink}>← 운행 기록</Link>
-      </p>
-      <div className="page-header">
-        <h1 id="trip-title">
-          운행 상세 <span className="muted small">{formatTripDate(detail.tripDate)} · {detail.vehicle.regNo}</span>
-        </h1>
-      </div>
+      <PageHeader
+        id="trip-title"
+        eyebrow={
+          <Link to={backLink} className="back-link">
+            <Icon name="arrowLeft" size={16} />
+            운행 기록
+          </Link>
+        }
+        title="운행 상세"
+        description={
+          <span className="meta">
+            <span className="meta__item">
+              <Icon name="calendar" size={16} />
+              {formatTripDate(detail.tripDate)}
+            </span>
+            <span className="meta__item">
+              <Icon name="car" size={16} />
+              {detail.vehicle.regNo}
+            </span>
+            <span className="meta__item">
+              <Icon name="route" size={16} />
+              {formatKm(detail.distanceKm)} km
+            </span>
+          </span>
+        }
+      />
 
       {detail.masked && (
         <Alert kind="info">
@@ -87,7 +108,12 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
 
       <div className="grid-2">
         <section className="card" aria-labelledby="trip-current-title">
-          <h2 id="trip-current-title">현재 기록</h2>
+          <div className="card__head">
+            <span className="card__icon" aria-hidden="true">
+              <Icon name="file" size={18} />
+            </span>
+            <h2 id="trip-current-title">현재 기록</h2>
+          </div>
           <dl className="dl">
             <dt>사용일자</dt>
             <dd>{formatTripDate(detail.tripDate)}</dd>
@@ -113,7 +139,12 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
         </section>
 
         <section className="card" aria-labelledby="trip-auto-title">
-          <h2 id="trip-auto-title">차량 자동 기록 (수정 불가)</h2>
+          <div className="card__head">
+            <span className="card__icon" aria-hidden="true">
+              <Icon name="lock" size={18} />
+            </span>
+            <h2 id="trip-auto-title">차량 자동 기록 (수정 불가)</h2>
+          </div>
           <dl className="dl">
             <dt>시작 시각</dt>
             <dd>{detail.startedAt ? formatDateTime(detail.startedAt) : '(비공개)'}</dd>
@@ -138,12 +169,18 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
       </div>
 
       <section className="card" aria-labelledby="trip-edits-title">
-        <h2 id="trip-edits-title">수정 이력</h2>
+        <div className="card__head">
+          <span className="card__icon" aria-hidden="true">
+            <Icon name="history" size={18} />
+          </span>
+          <h2 id="trip-edits-title">수정 이력</h2>
+          {detail.edits.length > 0 && <span className="count">{detail.edits.length}</span>}
+        </div>
         {detail.edits.length === 0 ? (
           <p className="muted">수정 이력이 없습니다.</p>
         ) : (
-          <div className="table-wrap">
-            <table className="table">
+          <div className="table-wrap table-wrap--flush">
+            <table className="table table--stack">
               <thead>
                 <tr>
                   <th scope="col">순번</th>
@@ -157,25 +194,32 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
               <tbody>
                 {detail.edits.map((edit) => (
                   <tr key={edit.seq} data-testid={`edit-row-${edit.seq}`}>
-                    <td>{edit.seq}</td>
-                    <td>
+                    <td data-label="순번">{edit.seq}</td>
+                    <td data-label="수정 주체">
                       {labelOf(ACTOR_TYPE_LABEL, edit.actorType)}
-                      {edit.actorName && <div className="muted small">{edit.actorName}</div>}
+                      {edit.actorName && <div className="cell-sub">{edit.actorName}</div>}
                     </td>
-                    <td className="wrap">
+                    <td className="wrap" data-label="변경 내용">
                       <ul className="changes">
                         {edit.changes.map((change) => (
                           <li key={change.field}>
-                            <span className="strong">{EDIT_FIELD_LABEL[change.field] ?? change.field}</span>:{' '}
-                            {formatEditValue(change.field, change.before, drivers.data, detail.masked)} →{' '}
-                            {formatEditValue(change.field, change.after, drivers.data, detail.masked)}
+                            <span className="changes__field">{EDIT_FIELD_LABEL[change.field] ?? change.field}</span>
+                            <span className="sr-only">: </span>
+                            <span className="changes__value">
+                              <span className="changes__before">
+                                {formatEditValue(change.field, change.before, drivers.data, detail.masked)}
+                              </span>
+                              <Icon name="arrowRight" size={14} className="route__arrow" />
+                              <span className="sr-only"> → </span>
+                              <span>{formatEditValue(change.field, change.after, drivers.data, detail.masked)}</span>
+                            </span>
                           </li>
                         ))}
                       </ul>
                     </td>
-                    <td className="wrap">{edit.reason ?? '-'}</td>
-                    <td>{formatDateTime(edit.editedAt)}</td>
-                    <td>{formatDateTime(edit.receivedAt)}</td>
+                    <td className="wrap" data-label="사유">{edit.reason ?? '-'}</td>
+                    <td data-label="수정 시각">{formatDateTime(edit.editedAt)}</td>
+                    <td data-label="서버 수신">{formatDateTime(edit.receivedAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -185,7 +229,12 @@ export function TripDetailPage({ clientUuid }: { clientUuid: string }) {
       </section>
 
       <section className="card" aria-labelledby="trip-edit-title">
-        <h2 id="trip-edit-title">관리자 수정</h2>
+        <div className="card__head">
+          <span className="card__icon" aria-hidden="true">
+            <Icon name="edit" size={18} />
+          </span>
+          <h2 id="trip-edit-title">관리자 수정</h2>
+        </div>
         {detail.purpose === 'PERSONAL' ? (
           <Alert kind="warning">
             개인 운행은 관리자가 수정할 수 없습니다. 용도 변경은 차량에서 운전자만 할 수 있습니다.
@@ -275,7 +324,7 @@ function EditForm({ trip, drivers, onSaving, onSaved }: EditFormProps) {
 
   return (
     <form className="form" onSubmit={handleSubmit} noValidate aria-describedby="trip-edit-help">
-      <p id="trip-edit-help" className="muted small">
+      <p id="trip-edit-help" className="form__help">
         수정할 수 있는 항목은 용도·업무 세부·메모·직원입니다. 시각·계기판 거리는 차량이 기록한 값이라 바꿀 수 없습니다. 관리자는 용도를
         개인으로 바꿀 수 없습니다.
       </p>
@@ -306,7 +355,7 @@ function EditForm({ trip, drivers, onSaving, onSaved }: EditFormProps) {
               </option>
             ))}
           </select>
-          <span id="edit-category-help" className="muted small">
+          <span id="edit-category-help" className="field__help">
             용도가 업무일 때만 저장됩니다.
           </span>
         </div>
@@ -351,6 +400,7 @@ function EditForm({ trip, drivers, onSaving, onSaved }: EditFormProps) {
       </div>
       <div className="form__actions">
         <button type="submit" className="button button--primary" disabled={submitting}>
+          <Icon name="check" size={18} />
           {submitting ? '저장 중…' : '수정 저장'}
         </button>
       </div>

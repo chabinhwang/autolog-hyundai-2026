@@ -6,7 +6,7 @@ export function LoadingState({ loading, error, onRetry }: { loading: boolean; er
   if (error) {
     return (
       <Alert kind="error">
-        {errorMessage(error)}
+        <span>{errorMessage(error)}</span>
         {onRetry && (
           <button type="button" className="button button--small alert__action" onClick={onRetry}>
             다시 시도
@@ -17,7 +17,8 @@ export function LoadingState({ loading, error, onRetry }: { loading: boolean; er
   }
   if (loading) {
     return (
-      <p className="muted" role="status">
+      <p className="loading" role="status">
+        <span className="spinner" aria-hidden="true" />
         불러오는 중…
       </p>
     )

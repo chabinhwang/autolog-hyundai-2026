@@ -3,8 +3,11 @@ import { createPlace, deletePlace, fetchPlaces, updatePlace } from '../api/place
 import type { Place, PlaceType } from '../api/types'
 import { Alert } from '../components/Alert'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { EmptyState } from '../components/EmptyState'
+import { Icon } from '../components/Icon'
 import { LoadingState } from '../components/LoadingState'
 import { Modal } from '../components/Modal'
+import { PageHeader } from '../components/PageHeader'
 import { useApiData } from '../hooks/useApiData'
 import { errorMessage } from '../lib/errors'
 import { formatDateTime } from '../lib/format'
@@ -41,37 +44,38 @@ export function PlacesPage() {
 
   return (
     <section aria-labelledby="places-title">
-      <div className="page-header">
-        <h1 id="places-title">장소 (회사·거래처)</h1>
-        <div className="page-header__actions">
-          <div className="field field--inline">
-            <label htmlFor="places-type">유형</label>
-            <select id="places-type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as PlaceType | '')}>
-              <option value="">전체</option>
-              {PLACE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {PLACE_TYPE_LABEL[t]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button type="button" className="button button--primary" onClick={() => open({ type: 'create' })}>
-            장소 추가
-          </button>
-        </div>
-      </div>
-      <p className="muted">
-        차량 앱이 도착 장소를 판정하는 기준입니다. 집 위치는 서버에 저장하지 않습니다(차량 앱에만 보관). 바꾼 내용은 차량의 다음 설정
-        내려받기 때 반영됩니다.
-      </p>
+      <PageHeader
+        id="places-title"
+        title="장소 (회사·거래처)"
+        description="차량 앱이 도착 장소를 판정하는 기준입니다. 집 위치는 서버에 저장하지 않고 차량 앱에만 보관합니다. 바꾼 내용은 차량이 다음에 설정을 내려받을 때 반영됩니다."
+        actions={
+          <>
+            <div className="field field--inline">
+              <label htmlFor="places-type">유형</label>
+              <select id="places-type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as PlaceType | '')}>
+                <option value="">전체</option>
+                {PLACE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {PLACE_TYPE_LABEL[t]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="button" className="button button--primary" onClick={() => open({ type: 'create' })}>
+              <Icon name="plus" size={18} />
+              장소 추가
+            </button>
+          </>
+        }
+      />
 
       {notice && <Alert kind="success">{notice}</Alert>}
       <LoadingState loading={places.loading && !places.data} error={places.error} onRetry={places.reload} />
 
-      {places.data && places.data.length === 0 && <p className="empty">등록된 장소가 없습니다.</p>}
+      {places.data && places.data.length === 0 && <EmptyState icon="pin">등록된 장소가 없습니다.</EmptyState>}
       {places.data && places.data.length > 0 && (
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table--stack">
             <thead>
               <tr>
                 <th scope="col">이름</th>
@@ -86,13 +90,19 @@ export function PlacesPage() {
             <tbody>
               {places.data.map((place) => (
                 <tr key={place.id}>
-                  <th scope="row">{place.name}</th>
-                  <td>{PLACE_TYPE_LABEL[place.type] ?? place.type}</td>
-                  <td className="num">{place.lat.toFixed(6)}</td>
-                  <td className="num">{place.lng.toFixed(6)}</td>
-                  <td className="num">{place.radiusM} m</td>
-                  <td>{formatDateTime(place.updatedAt)}</td>
-                  <td>
+                  <th scope="row" className="cell-title">
+                    {place.name}
+                  </th>
+                  <td data-label="유형">
+                    <span className={place.type === 'COMPANY' ? 'tag tag--strong' : 'tag'}>
+                      {PLACE_TYPE_LABEL[place.type] ?? place.type}
+                    </span>
+                  </td>
+                  <td className="num mono" data-label="위도">{place.lat.toFixed(6)}</td>
+                  <td className="num mono" data-label="경도">{place.lng.toFixed(6)}</td>
+                  <td className="num" data-label="반경">{place.radiusM} m</td>
+                  <td data-label="수정 시각">{formatDateTime(place.updatedAt)}</td>
+                  <td className="cell-actions" data-label="관리">
                     <div className="actions">
                       <button
                         type="button"
@@ -100,6 +110,7 @@ export function PlacesPage() {
                         onClick={() => open({ type: 'edit', place })}
                         aria-label={`${place.name} 수정`}
                       >
+                        <Icon name="edit" size={16} />
                         수정
                       </button>
                       <button
@@ -108,6 +119,7 @@ export function PlacesPage() {
                         onClick={() => open({ type: 'delete', place })}
                         aria-label={`${place.name} 삭제`}
                       >
+                        <Icon name="trash" size={16} />
                         삭제
                       </button>
                     </div>
@@ -229,7 +241,7 @@ function PlaceFormDialog({ place, onClose, onSaved }: PlaceFormDialogProps) {
               onChange={(e) => setLat(e.target.value)}
               aria-describedby="place-lat-help"
             />
-            <span id="place-lat-help" className="muted small">
+            <span id="place-lat-help" className="field__help">
               {LAT_MIN} ~ {LAT_MAX}, 소수 6자리까지
             </span>
           </div>
@@ -247,7 +259,7 @@ function PlaceFormDialog({ place, onClose, onSaved }: PlaceFormDialogProps) {
               onChange={(e) => setLng(e.target.value)}
               aria-describedby="place-lng-help"
             />
-            <span id="place-lng-help" className="muted small">
+            <span id="place-lng-help" className="field__help">
               {LNG_MIN} ~ {LNG_MAX}, 소수 6자리까지
             </span>
           </div>
@@ -264,12 +276,12 @@ function PlaceFormDialog({ place, onClose, onSaved }: PlaceFormDialogProps) {
               onChange={(e) => setRadius(e.target.value)}
               aria-describedby="place-radius-help"
             />
-            <span id="place-radius-help" className="muted small">
+            <span id="place-radius-help" className="field__help">
               {RADIUS_MIN} ~ {RADIUS_MAX}m, 기본 {RADIUS_DEFAULT}m
             </span>
           </div>
         </div>
-        <p className="muted small">지도 검색은 아직 없습니다. 지도 서비스에서 좌표를 확인해 직접 입력해 주세요.</p>
+        <p className="form__help">지도 검색은 아직 없습니다. 지도 서비스에서 좌표를 확인해 직접 입력해 주세요.</p>
         <div className="modal__actions">
           <button type="button" className="button" onClick={onClose} disabled={busy}>
             취소

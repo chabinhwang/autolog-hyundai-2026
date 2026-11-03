@@ -3,8 +3,11 @@ import { createDriver, fetchDrivers, updateDriver } from '../api/drivers'
 import type { Driver } from '../api/types'
 import { Alert } from '../components/Alert'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { EmptyState } from '../components/EmptyState'
+import { Icon } from '../components/Icon'
 import { LoadingState } from '../components/LoadingState'
 import { Modal } from '../components/Modal'
+import { PageHeader } from '../components/PageHeader'
 import { useApiData } from '../hooks/useApiData'
 import { errorMessage } from '../lib/errors'
 
@@ -43,28 +46,32 @@ export function DriversPage() {
 
   return (
     <section aria-labelledby="drivers-title">
-      <div className="page-header">
-        <h1 id="drivers-title">직원</h1>
-        <div className="page-header__actions">
-          <label className="checkbox">
-            <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
-            비활성 직원 포함
-          </label>
-          <button type="button" className="button button--primary" onClick={() => open({ type: 'create' })}>
-            직원 추가
-          </button>
-        </div>
-      </div>
-      <p className="muted">직원은 차량 이용자입니다. 운행기록부의 부서·성명으로 쓰이며, 차량 앱의 이용자 선택 목록에 내려갑니다.</p>
+      <PageHeader
+        id="drivers-title"
+        title="직원"
+        description="직원은 차량 이용자입니다. 운행기록부의 부서·성명으로 쓰이며, 차량 앱의 이용자 선택 목록에 내려갑니다."
+        actions={
+          <>
+            <label className="checkbox">
+              <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
+              비활성 직원 포함
+            </label>
+            <button type="button" className="button button--primary" onClick={() => open({ type: 'create' })}>
+              <Icon name="plus" size={18} />
+              직원 추가
+            </button>
+          </>
+        }
+      />
 
       {notice && <Alert kind="success">{notice}</Alert>}
       {pageError && <Alert kind="error">{pageError}</Alert>}
       <LoadingState loading={drivers.loading && !drivers.data} error={drivers.error} onRetry={drivers.reload} />
 
-      {drivers.data && drivers.data.length === 0 && <p className="empty">등록된 직원이 없습니다.</p>}
+      {drivers.data && drivers.data.length === 0 && <EmptyState icon="users">등록된 직원이 없습니다.</EmptyState>}
       {drivers.data && drivers.data.length > 0 && (
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table--stack">
             <thead>
               <tr>
                 <th scope="col">부서</th>
@@ -76,10 +83,19 @@ export function DriversPage() {
             <tbody>
               {drivers.data.map((driver) => (
                 <tr key={driver.id} className={driver.active ? undefined : 'row--inactive'}>
-                  <td>{driver.dept}</td>
-                  <th scope="row">{driver.name}</th>
-                  <td>{driver.active ? '사용 중' : <span className="badge">비활성</span>}</td>
-                  <td>
+                  <td data-label="부서">{driver.dept}</td>
+                  <th scope="row" className="cell-title">
+                    <span className="person">
+                      <span className="avatar avatar--soft" aria-hidden="true">
+                        {driver.name.slice(0, 1)}
+                      </span>
+                      {driver.name}
+                    </span>
+                  </th>
+                  <td data-label="상태">
+                    {driver.active ? <span className="status">사용 중</span> : <span className="status status--off">비활성</span>}
+                  </td>
+                  <td className="cell-actions" data-label="관리">
                     <div className="actions">
                       <button
                         type="button"
@@ -87,6 +103,7 @@ export function DriversPage() {
                         onClick={() => open({ type: 'edit', driver })}
                         aria-label={`${driver.name} 수정`}
                       >
+                        <Icon name="edit" size={16} />
                         수정
                       </button>
                       {driver.active ? (
@@ -96,6 +113,7 @@ export function DriversPage() {
                           onClick={() => open({ type: 'deactivate', driver })}
                           aria-label={`${driver.name} 비활성`}
                         >
+                          <Icon name="ban" size={16} />
                           비활성
                         </button>
                       ) : (
@@ -105,6 +123,7 @@ export function DriversPage() {
                           onClick={() => reactivate(driver)}
                           aria-label={`${driver.name} 다시 사용`}
                         >
+                          <Icon name="restore" size={16} />
                           다시 사용
                         </button>
                       )}

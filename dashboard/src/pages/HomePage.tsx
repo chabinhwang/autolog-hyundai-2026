@@ -1,8 +1,10 @@
 import { fetchSummary } from '../api/dashboard'
 import type { DashboardSummary } from '../api/types'
 import { DistanceBar } from '../components/DistanceBar'
+import { EmptyState } from '../components/EmptyState'
 import { Icon } from '../components/Icon'
 import { LoadingState } from '../components/LoadingState'
+import { PageHeader } from '../components/PageHeader'
 import { WarningBadges } from '../components/WarningBadges'
 import { useApiData } from '../hooks/useApiData'
 import { isValidMonth, monthRange } from '../lib/dates'
@@ -27,27 +29,30 @@ export function HomePage() {
 
   return (
     <section aria-labelledby="home-title">
-      <div className="page-header">
-        <div>
-          <h1 id="home-title">월간 업무사용비율</h1>
-          <p className="page-header__desc">차량별 주행거리와 업무사용비율, 확인이 필요한 경고를 한눈에 봅니다.</p>
-        </div>
-        <div className="field field--inline">
-          <label htmlFor="summary-month">조회 월</label>
-          <input
-            id="summary-month"
-            type="month"
-            value={month}
-            onChange={(event) => {
-              if (isValidMonth(event.target.value)) navigate(`/?month=${event.target.value}`, { replace: true })
-            }}
-          />
-        </div>
-      </div>
+      <PageHeader
+        id="home-title"
+        title="월간 업무사용비율"
+        description="차량별 주행거리와 업무사용비율, 확인이 필요한 경고를 한눈에 봅니다."
+        actions={
+          <div className="field field--inline">
+            <label htmlFor="summary-month">조회 월</label>
+            <input
+              id="summary-month"
+              type="month"
+              value={month}
+              onChange={(event) => {
+                if (isValidMonth(event.target.value)) navigate(`/?month=${event.target.value}`, { replace: true })
+              }}
+            />
+          </div>
+        }
+      />
 
       <LoadingState loading={loading && !summary} error={error} onRetry={reload} />
 
-      {summary && summary.vehicles.length === 0 && <p className="empty">활성 차량이 없습니다. 차량 메뉴에서 차량을 추가해 주세요.</p>}
+      {summary && summary.vehicles.length === 0 && (
+        <EmptyState icon="car">활성 차량이 없습니다. 차량 메뉴에서 차량을 추가해 주세요.</EmptyState>
+      )}
 
       {summary && summary.vehicles.length > 0 && <SummaryCards summary={summary} />}
 
@@ -55,9 +60,11 @@ export function HomePage() {
         <div className="table-wrap">
           <div className="table-wrap__head">
             <h2>차량별 집계</h2>
-            <span className="muted small">단위 km · 업무사용비율 = (출퇴근 + 업무) ÷ 총주행거리</span>
+            <p className="table-wrap__note">
+              단위 km · 업무사용비율 = (출퇴근 + 업무) ÷ 총주행거리
+            </p>
           </div>
-          <table className="table" aria-describedby="home-title">
+          <table className="table table--cards" aria-describedby="home-title">
             <caption className="sr-only">{summary.month} 차량별 운행 집계 (단위 km)</caption>
             <thead>
               <tr>
@@ -78,32 +85,32 @@ export function HomePage() {
             <tbody>
               {summary.vehicles.map((vehicle) => (
                 <tr key={vehicle.vehicleId} data-testid={`summary-row-${vehicle.vehicleId}`}>
-                  <th scope="row">
+                  <th scope="row" className="cell-title">
                     <Link to={tripsLink(summary.month, vehicle.vehicleId)}>{vehicle.regNo}</Link>
-                    <div className="muted small">{vehicle.modelName}</div>
+                    <div className="cell-sub">{vehicle.modelName}</div>
                   </th>
-                  <td>{vehicle.defaultDriver ? `${vehicle.defaultDriver.name} (${vehicle.defaultDriver.dept})` : '-'}</td>
-                  <td className="num">{vehicle.tripCount}건</td>
-                  <td className="num">{formatKm(vehicle.totalKm)}</td>
-                  <td className="num">{formatKm(vehicle.commuteKm)}</td>
-                  <td className="num">{formatKm(vehicle.businessKm)}</td>
-                  <td className="num">{formatKm(vehicle.personalKm)}</td>
-                  <td className="num">
+                  <td className="span-all" data-label="기본 운전자">{vehicle.defaultDriver ? `${vehicle.defaultDriver.name} (${vehicle.defaultDriver.dept})` : '-'}</td>
+                  <td className="num" data-label="운행">{vehicle.tripCount}건</td>
+                  <td className="num" data-label="총주행">{formatKm(vehicle.totalKm)}</td>
+                  <td className="num" data-label="출퇴근">{formatKm(vehicle.commuteKm)}</td>
+                  <td className="num" data-label="업무">{formatKm(vehicle.businessKm)}</td>
+                  <td className="num" data-label="개인">{formatKm(vehicle.personalKm)}</td>
+                  <td className="num" data-label="미확인">
                     {formatKm(vehicle.unconfirmedKm)}
                     {vehicle.unconfirmedCount > 0 && (
-                      <div className="small">
+                      <div className="cell-sub">
                         <Link to={tripsLink(summary.month, vehicle.vehicleId, 'UNCONFIRMED')}>
                           {vehicle.unconfirmedCount}건 보기
                         </Link>
                       </div>
                     )}
                   </td>
-                  <td className="num">
+                  <td className="num" data-label="업무비율">
                     <span className="ratio">{formatRatio(vehicle.businessRatio)}</span>
                     {vehicle.totalKm > 0 && <DistanceBar parts={vehicle} />}
                   </td>
-                  <td className="num">{formatRatio(vehicle.maxBusinessRatio)}</td>
-                  <td>
+                  <td className="num" data-label="최대 비율">{formatRatio(vehicle.maxBusinessRatio)}</td>
+                  <td className="span-all" data-label="마지막 동기화">
                     {vehicle.paired ? (
                       <span className="sync">
                         <span className="dot dot--ok" aria-hidden="true" />
@@ -116,7 +123,7 @@ export function HomePage() {
                       </span>
                     )}
                   </td>
-                  <td>
+                  <td className="span-all" data-label="경고">
                     <WarningBadges warnings={vehicle.warnings} />
                   </td>
                 </tr>
@@ -124,18 +131,20 @@ export function HomePage() {
             </tbody>
             <tfoot>
               <tr data-testid="summary-totals">
-                <th scope="row">합계</th>
+                <th scope="row" className="cell-title">합계</th>
                 <td />
                 <td />
-                <td className="num">{formatKm(summary.totals.totalKm)}</td>
-                <td className="num">{formatKm(summary.totals.commuteKm)}</td>
-                <td className="num">{formatKm(summary.totals.businessKm)}</td>
-                <td className="num">{formatKm(summary.totals.personalKm)}</td>
-                <td className="num">
+                <td className="num" data-label="총주행">{formatKm(summary.totals.totalKm)}</td>
+                <td className="num" data-label="출퇴근">{formatKm(summary.totals.commuteKm)}</td>
+                <td className="num" data-label="업무">{formatKm(summary.totals.businessKm)}</td>
+                <td className="num" data-label="개인">{formatKm(summary.totals.personalKm)}</td>
+                <td className="num" data-label="미확인">
                   {formatKm(summary.totals.unconfirmedKm)}
-                  {summary.totals.unconfirmedCount > 0 && <div className="small">{summary.totals.unconfirmedCount}건</div>}
+                  {summary.totals.unconfirmedCount > 0 && <div className="cell-sub">{summary.totals.unconfirmedCount}건</div>}
                 </td>
-                <td className="num strong">{formatRatio(summary.totals.businessRatio)}</td>
+                <td className="num" data-label="업무비율">
+                  <span className="ratio">{formatRatio(summary.totals.businessRatio)}</span>
+                </td>
                 <td />
                 <td />
                 <td />
@@ -146,7 +155,11 @@ export function HomePage() {
       )}
 
       <details className="legend card">
-        <summary>경고 설명</summary>
+        <summary>
+          <Icon name="info" size={18} />
+          <span>경고 설명</span>
+          <Icon name="chevronDown" size={18} className="legend__chevron" />
+        </summary>
         <dl>
           {Object.entries(WARNING_LABEL).map(([code, info]) => (
             <div key={code}>
@@ -175,7 +188,9 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
     <div className="kpis" aria-label="이번 달 요약">
       <div className="kpi kpi--primary">
         <div className="kpi__label">
-          <Icon name="gauge" size={18} />
+          <span className="kpi__icon">
+            <Icon name="gauge" size={18} />
+          </span>
           업무사용비율
         </div>
         <div className="kpi__value">{formatRatio(ratio)}</div>
@@ -185,9 +200,11 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
         </div>
         <div className="kpi__sub">미확인이 모두 업무라면 최대 {formatRatio(maxRatio)}</div>
       </div>
-      <div className="kpi">
+      <div className="kpi kpi--wide">
         <div className="kpi__label">
-          <Icon name="route" size={18} />
+          <span className="kpi__icon">
+            <Icon name="route" size={18} />
+          </span>
           총주행거리
         </div>
         <div className="kpi__value">
@@ -198,18 +215,24 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
       </div>
       <div className={totals.unconfirmedCount > 0 ? 'kpi kpi--attention' : 'kpi'}>
         <div className="kpi__label">
-          <Icon name="question" size={18} />
+          <span className="kpi__icon">
+            <Icon name="question" size={18} />
+          </span>
           미확인 운행
         </div>
         <div className="kpi__value">
           {totals.unconfirmedCount}
           <span className="kpi__unit">건</span>
         </div>
-        <div className="kpi__sub">전체 {trips}건 중 · {formatKm(totals.unconfirmedKm)} km</div>
+        <div className="kpi__sub">
+          전체 {trips}건 중 · {formatKm(totals.unconfirmedKm)} km
+        </div>
       </div>
       <div className={warned > 0 ? 'kpi kpi--attention' : 'kpi'}>
         <div className="kpi__label">
-          <Icon name="alert" size={18} />
+          <span className="kpi__icon">
+            <Icon name="alert" size={18} />
+          </span>
           경고 차량
         </div>
         <div className="kpi__value">

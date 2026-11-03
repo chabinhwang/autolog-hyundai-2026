@@ -4,7 +4,10 @@ import { fetchTrips } from '../api/trips'
 import type { Purpose } from '../api/types'
 import { fetchVehicles } from '../api/vehicles'
 import { Alert } from '../components/Alert'
+import { EmptyState } from '../components/EmptyState'
+import { Icon } from '../components/Icon'
 import { LoadingState } from '../components/LoadingState'
+import { PageHeader } from '../components/PageHeader'
 import { useApiData } from '../hooks/useApiData'
 import { MAX_RANGE_DAYS, monthRange, validateRange } from '../lib/dates'
 import { currentMonthInSeoul, formatKm, formatTripDate } from '../lib/format'
@@ -100,16 +103,18 @@ export function TripListPage() {
 
   return (
     <section aria-labelledby="trips-title">
-      <div className="page-header">
-        <h1 id="trips-title">운행 기록</h1>
-      </div>
+      <PageHeader
+        id="trips-title"
+        title="운행 기록"
+        description="차량이 자동으로 남긴 운행을 기간·차량·직원·용도별로 찾아봅니다."
+      />
 
       <form className="filters" onSubmit={handleSubmit} aria-label="운행 기록 조회 조건">
-        <div className="field">
+        <div className="field filters__date">
           <label htmlFor="trips-from">시작일</label>
           <input id="trips-from" type="date" required value={draft.from} onChange={(e) => update('from', e.target.value)} />
         </div>
-        <div className="field">
+        <div className="field filters__date">
           <label htmlFor="trips-to">종료일</label>
           <input id="trips-to" type="date" required value={draft.to} onChange={(e) => update('to', e.target.value)} />
         </div>
@@ -149,10 +154,11 @@ export function TripListPage() {
         </div>
         <div className="filters__actions">
           <button type="submit" className="button button--primary">
+            <Icon name="search" size={18} />
             조회
           </button>
         </div>
-        <p className="muted small filters__hint">기간은 최대 {MAX_RANGE_DAYS}일까지 조회할 수 있습니다.</p>
+        <p className="filters__hint">기간은 최대 {MAX_RANGE_DAYS}일까지 조회할 수 있습니다.</p>
       </form>
 
       {formError && <Alert kind="error">{formError}</Alert>}
@@ -160,23 +166,23 @@ export function TripListPage() {
 
       {!rangeError && <LoadingState loading={trips.loading && !result} error={trips.error} onRetry={trips.reload} />}
 
-      {!rangeError && result && result.content.length === 0 && <p className="empty">조건에 맞는 운행 기록이 없습니다.</p>}
+      {!rangeError && result && result.content.length === 0 && <EmptyState icon="route">조건에 맞는 운행 기록이 없습니다.</EmptyState>}
 
       {!rangeError && result && result.content.length > 0 && (
         <>
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table--trips">
               <caption className="sr-only">운행 기록 목록 (시작 시각 내림차순)</caption>
               <thead>
                 <tr>
                   <th scope="col">사용일자 · 시간</th>
                   <th scope="col">차량 · 직원</th>
                   <th scope="col">출발 → 도착</th>
-                  <th scope="col" className="num">주행 전</th>
-                  <th scope="col" className="num">주행 후</th>
+                  <th scope="col" className="num col-odo">주행 전</th>
+                  <th scope="col" className="num col-odo">주행 후</th>
                   <th scope="col" className="num">주행거리</th>
                   <th scope="col">용도</th>
-                  <th scope="col">판정</th>
+                  <th scope="col" className="col-source">판정</th>
                   <th scope="col">
                     <span className="sr-only">상세</span>
                   </th>
@@ -187,36 +193,46 @@ export function TripListPage() {
                   const time = describeTimeRange(trip.startedAt, trip.endedAt)
                   return (
                     <tr key={trip.clientUuid} data-testid={`trip-row-${trip.clientUuid}`}>
-                      <td>
+                      <td className="trip__when">
                         <div className="strong">{formatTripDate(trip.tripDate)}</div>
                         <div className="cell-sub">{time ?? <span className="muted">{trip.masked ? '비공개' : '-'}</span>}</div>
                       </td>
-                      <td>
+                      <td className="trip__who">
                         <div>{trip.vehicle.regNo}</div>
-                        <div className="cell-sub muted">{describeDriver(trip.driver)}</div>
+                        <div className="cell-sub">{describeDriver(trip.driver)}</div>
                       </td>
-                      <td className="wrap">
-                        <span className={trip.masked && !trip.origin?.label ? 'muted' : undefined}>
-                          {describePlace(trip.origin, trip.masked)}
-                        </span>
-                        {' → '}
-                        <span className={trip.masked && !trip.dest?.label ? 'muted' : undefined}>
-                          {describePlace(trip.dest, trip.masked)}
+                      <td className="wrap trip__route">
+                        <span className="route">
+                          <span className={trip.masked && !trip.origin?.label ? 'route__place muted' : 'route__place'}>
+                            {describePlace(trip.origin, trip.masked)}
+                          </span>
+                          <Icon name="arrowRight" size={14} className="route__arrow" />
+                          <span className="sr-only"> → </span>
+                          <span className={trip.masked && !trip.dest?.label ? 'route__place muted' : 'route__place'}>
+                            {describePlace(trip.dest, trip.masked)}
+                          </span>
                         </span>
                       </td>
-                      <td className="num">{formatKm(trip.odoStartKm)}</td>
-                      <td className="num">{formatKm(trip.odoEndKm)}</td>
-                      <td className="num">{formatKm(trip.distanceKm)} km</td>
-                      <td>
-                        <span className={`purpose purpose--${trip.purpose.toLowerCase()}`}>
-                          {describePurpose(trip.purpose, trip.businessCategory)}
+                      <td className="num col-odo">{formatKm(trip.odoStartKm)}</td>
+                      <td className="num col-odo">{formatKm(trip.odoEndKm)}</td>
+                      <td className="num trip__distance">{formatKm(trip.distanceKm)} km</td>
+                      <td className="trip__purpose">
+                        <span className="chips">
+                          <span className={`purpose purpose--${trip.purpose.toLowerCase()}`}>
+                            {describePurpose(trip.purpose, trip.businessCategory)}
+                          </span>
+                          {trip.edited && <span className="badge">수정됨</span>}
                         </span>
-                        {trip.edited && <span className="badge badge--info">수정됨</span>}
                       </td>
-                      <td className="small">{labelOf(PURPOSE_SOURCE_LABEL, trip.purposeSource)}</td>
-                      <td>
-                        <Link to={`/trips/${encodeURIComponent(trip.clientUuid)}`} aria-label={`${trip.tripDate} 운행 상세`}>
-                          상세
+                      <td className="trip__source col-source cell-sub">{labelOf(PURPOSE_SOURCE_LABEL, trip.purposeSource)}</td>
+                      <td className="trip__link">
+                        <Link
+                          to={`/trips/${encodeURIComponent(trip.clientUuid)}`}
+                          className="icon-link"
+                          aria-label={`${trip.tripDate} 운행 상세`}
+                        >
+                          <span aria-hidden="true">상세</span>
+                          <Icon name="chevronRight" size={16} />
                         </Link>
                       </td>
                     </tr>
@@ -232,9 +248,10 @@ export function TripListPage() {
               disabled={result.page <= 0}
               onClick={() => navigate(`/trips${toSearch(applied, result.page - 1)}`)}
             >
+              <Icon name="chevronLeft" size={16} />
               이전
             </button>
-            <span>
+            <span className="pagination__status">
               {result.page + 1} / {Math.max(result.totalPages, 1)} 페이지 (총 {result.totalElements}건)
             </span>
             <button
@@ -244,6 +261,7 @@ export function TripListPage() {
               onClick={() => navigate(`/trips${toSearch(applied, result.page + 1)}`)}
             >
               다음
+              <Icon name="chevronRight" size={16} />
             </button>
           </nav>
         </>

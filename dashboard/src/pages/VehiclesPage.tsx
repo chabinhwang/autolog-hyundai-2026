@@ -4,8 +4,11 @@ import type { Driver, PairResponse, Vehicle } from '../api/types'
 import { createVehicle, fetchVehicles, pairDevice, unpairDevice, updateVehicle } from '../api/vehicles'
 import { Alert } from '../components/Alert'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { EmptyState } from '../components/EmptyState'
+import { Icon } from '../components/Icon'
 import { LoadingState } from '../components/LoadingState'
 import { Modal } from '../components/Modal'
+import { PageHeader } from '../components/PageHeader'
 import { useApiData } from '../hooks/useApiData'
 import { errorMessage } from '../lib/errors'
 import { formatDateTime } from '../lib/format'
@@ -40,34 +43,39 @@ export function VehiclesPage() {
 
   return (
     <section aria-labelledby="vehicles-title">
-      <div className="page-header">
-        <h1 id="vehicles-title">차량</h1>
-        <div className="page-header__actions">
-          <label className="checkbox">
-            <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
-            비활성 차량 포함
-          </label>
-          <button
-            type="button"
-            className="button button--primary"
-            onClick={() => {
-              clearMessages()
-              setDialog({ type: 'create' })
-            }}
-          >
-            차량 추가
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        id="vehicles-title"
+        title="차량"
+        description="업무용승용차와 차량 앱 기기 연결을 관리합니다. 페어링한 차량만 운행 기록을 올릴 수 있습니다."
+        actions={
+          <>
+            <label className="checkbox">
+              <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
+              비활성 차량 포함
+            </label>
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={() => {
+                clearMessages()
+                setDialog({ type: 'create' })
+              }}
+            >
+              <Icon name="plus" size={18} />
+              차량 추가
+            </button>
+          </>
+        }
+      />
 
       {notice && <Alert kind="success">{notice}</Alert>}
       {pageError && <Alert kind="error">{pageError}</Alert>}
       <LoadingState loading={vehicles.loading && !vehicles.data} error={vehicles.error} onRetry={vehicles.reload} />
 
-      {vehicles.data && vehicles.data.length === 0 && <p className="empty">등록된 차량이 없습니다.</p>}
+      {vehicles.data && vehicles.data.length === 0 && <EmptyState icon="car">등록된 차량이 없습니다.</EmptyState>}
       {vehicles.data && vehicles.data.length > 0 && (
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table--cards">
             <thead>
               <tr>
                 <th scope="col">자동차등록번호</th>
@@ -81,22 +89,29 @@ export function VehiclesPage() {
             <tbody>
               {vehicles.data.map((vehicle) => (
                 <tr key={vehicle.id} data-testid={`vehicle-row-${vehicle.id}`} className={vehicle.active ? undefined : 'row--inactive'}>
-                  <th scope="row">{vehicle.regNo}</th>
-                  <td>{vehicle.modelName}</td>
-                  <td>{vehicle.defaultDriver ? describeDriver(vehicle.defaultDriver) : '-'}</td>
-                  <td>{vehicle.active ? '사용 중' : <span className="badge">비활성</span>}</td>
-                  <td>
+                  <th scope="row" className="cell-title">
+                    {vehicle.regNo}
+                  </th>
+                  <td data-label="차종">{vehicle.modelName}</td>
+                  <td data-label="기본 운전자">{vehicle.defaultDriver ? describeDriver(vehicle.defaultDriver) : '-'}</td>
+                  <td data-label="상태">
+                    {vehicle.active ? <span className="status">사용 중</span> : <span className="status status--off">비활성</span>}
+                  </td>
+                  <td className="span-all" data-label="차량 앱 연결">
                     {vehicle.device.paired ? (
-                      <>
-                        <span className="badge badge--ok">연결됨</span>
-                        <div className="muted small">페어링 {formatDateTime(vehicle.device.pairedAt)}</div>
-                        <div className="muted small">마지막 동기화 {formatDateTime(vehicle.device.lastSyncedAt)}</div>
-                      </>
+                      <div className="device">
+                        <span className="badge badge--ok">
+                          <Icon name="link" size={12} />
+                          연결됨
+                        </span>
+                        <div className="cell-sub">페어링 {formatDateTime(vehicle.device.pairedAt)}</div>
+                        <div className="cell-sub">마지막 동기화 {formatDateTime(vehicle.device.lastSyncedAt)}</div>
+                      </div>
                     ) : (
-                      <span className="muted">연결 안 됨</span>
+                      <span className="status status--off">연결 안 됨</span>
                     )}
                   </td>
-                  <td>
+                  <td className="span-all cell-actions" data-label="관리">
                     <div className="actions">
                       <button
                         type="button"
@@ -107,6 +122,7 @@ export function VehiclesPage() {
                         }}
                         aria-label={`${vehicle.regNo} 수정`}
                       >
+                        <Icon name="edit" size={16} />
                         수정
                       </button>
                       {vehicle.active && (
@@ -119,6 +135,7 @@ export function VehiclesPage() {
                           }}
                           aria-label={`${vehicle.regNo} ${vehicle.device.paired ? '다시 페어링' : '페어링'}`}
                         >
+                          <Icon name="link" size={16} />
                           {vehicle.device.paired ? '다시 페어링' : '페어링'}
                         </button>
                       )}
@@ -132,6 +149,7 @@ export function VehiclesPage() {
                           }}
                           aria-label={`${vehicle.regNo} 연결 해제`}
                         >
+                          <Icon name="unlink" size={16} />
                           연결 해제
                         </button>
                       )}
@@ -145,6 +163,7 @@ export function VehiclesPage() {
                           }}
                           aria-label={`${vehicle.regNo} 비활성`}
                         >
+                          <Icon name="ban" size={16} />
                           비활성
                         </button>
                       ) : (
@@ -162,6 +181,7 @@ export function VehiclesPage() {
                           }}
                           aria-label={`${vehicle.regNo} 다시 사용`}
                         >
+                          <Icon name="restore" size={16} />
                           다시 사용
                         </button>
                       )}
@@ -355,7 +375,7 @@ function PairDialog({ vehicle, onClose, onPaired }: PairDialogProps) {
   return (
     <Modal title={`${vehicle.regNo} 페어링`} onClose={onClose} busy={busy}>
       <form className="form" onSubmit={handleSubmit} noValidate>
-        <p className="muted">
+        <p className="form__help">
           차량 앱의 페어링 화면에 표시된 6자리 코드를 입력하세요. 코드는 10분 동안 한 번만 쓸 수 있습니다.
         </p>
         {vehicle.device.paired && (
