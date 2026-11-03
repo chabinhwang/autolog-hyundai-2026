@@ -104,6 +104,12 @@ class ProbeActivity : ComponentActivity() {
                 "network" -> probeNetwork()
                 "sttfile" -> probeSttFile()
                 "navi" -> probeNavi()
+                "geocoder" -> probeGeocoder()
+                "notify" -> probeNotify()
+                "notifylater" -> {
+                    log("5초 뒤 알림 게시")
+                    android.os.Handler(mainLooper).postDelayed({ probeNotify() }, 5_000)
+                }
                 else -> log("알 수 없는 점검 항목: $name")
             }
         }
@@ -259,6 +265,45 @@ class ProbeActivity : ComponentActivity() {
                 }.getOrElse { "실패 ${it.javaClass.simpleName}: ${it.message}" }
                 log("네트워크 $url → $result")
             }
+        }
+    }
+
+    /** 버튼 3개짜리 heads-up 알림이 Pleos 화면 위로 뜨는지 확인한다(도착 질문 알림 검토용). */
+    private fun probeNotify() {
+        val manager = getSystemService(android.app.NotificationManager::class.java)
+        manager.createNotificationChannel(
+            android.app.NotificationChannel("probe_arrival", "도착 확인(점검)", android.app.NotificationManager.IMPORTANCE_HIGH),
+        )
+        fun action(label: String, code: Int) = android.app.Notification.Action.Builder(
+            null, label,
+            android.app.PendingIntent.getActivity(
+                this, code, android.content.Intent(this, ProbeActivity::class.java),
+                android.app.PendingIntent.FLAG_IMMUTABLE,
+            ),
+        ).build()
+        val notification = android.app.Notification.Builder(this, "probe_arrival")
+            .setSmallIcon(com.autolog.app.R.drawable.ic_launcher)
+            .setContentTitle("본사 도착, 12.4킬로미터")
+            .setContentText("출근으로 기록할까요?")
+            .setCategory(android.app.Notification.CATEGORY_REMINDER)
+            .addAction(action("출퇴근", 1))
+            .addAction(action("업무", 2))
+            .addAction(action("개인", 3))
+            .build()
+        manager.notify(9001, notification)
+        log("알림 게시: 채널 중요도 HIGH, 버튼 3개")
+    }
+
+    /** Android Geocoder로 좌표 → 동 이름을 얻을 수 있는지 확인한다(미등록 장소 표시 검토용). */
+    private fun probeGeocoder() {
+        log("Geocoder.isPresent=${android.location.Geocoder.isPresent()}")
+        thread {
+            val result = runCatching {
+                @Suppress("DEPRECATION")
+                android.location.Geocoder(this, java.util.Locale.KOREA).getFromLocation(37.4842, 126.9297, 1)
+                    ?.firstOrNull()?.let { "${it.adminArea} ${it.locality} ${it.subLocality} ${it.thoroughfare} / ${it.getAddressLine(0)}" }
+            }.getOrElse { "실패 ${it.javaClass.simpleName}: ${it.message}" }
+            log("Geocoder 결과: $result")
         }
     }
 
