@@ -55,7 +55,7 @@ class AndroidArrivalNotifications(private val context: Context) : ArrivalNotific
         val title = if (split > 0) prompt.substring(0, split) else prompt
         val body = if (split > 0) prompt.substring(split + 2) else "운행 용도를 골라 주세요."
         val notification = Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(body)
             .setCategory(Notification.CATEGORY_REMINDER)
@@ -70,7 +70,7 @@ class AndroidArrivalNotifications(private val context: Context) : ArrivalNotific
     override fun confirmed(tripUuid: String, message: String) {
         ensureChannel()
         val notification = Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(message)
             .setContentIntent(openApp())
             .setTimeoutAfter(CONFIRMED_VISIBLE_MS)

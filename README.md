@@ -11,7 +11,7 @@
 | [`app/`](app) | 차량 앱 (모듈 `:car`) | Kotlin, Jetpack Compose, Room, WorkManager, Pleos Connect SDK |
 | [`server/`](server) | 백엔드 API | Java 25, Spring Boot 4.1, PostgreSQL, Flyway |
 | [`dashboard/`](dashboard) | 관리자 웹 | React 19, TypeScript, Vite 8 |
-| [`apk/`](apk) | 제출용 APK (`팀명_앱이름_release.apk`) | |
+| [`apk/`](apk) | 제출용 APK (`팀명_앱이름_release.apk`), App Market 앱 아이콘 `app-icon-512.png` | |
 | [`deploy/`](deploy/README.md) | Oracle 운영 Compose·배포 스크립트·환경변수·복구 안내 | Docker Compose, GitHub Actions |
 
 ## 실행 방법

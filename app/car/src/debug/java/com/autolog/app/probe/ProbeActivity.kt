@@ -282,7 +282,7 @@ class ProbeActivity : ComponentActivity() {
             ),
         ).build()
         val notification = android.app.Notification.Builder(this, "probe_arrival")
-            .setSmallIcon(com.autolog.app.R.drawable.ic_launcher)
+            .setSmallIcon(com.autolog.app.R.drawable.ic_notification)
             .setContentTitle("본사 도착, 12.4킬로미터")
             .setContentText("출근으로 기록할까요?")
             .setCategory(android.app.Notification.CATEGORY_REMINDER)

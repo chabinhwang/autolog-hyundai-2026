@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 알림 작은 아이콘: 앱 아이콘과 같은 계기판 바늘을 흰색 한 가지로 (시스템이 색을 입힌다) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="20"
+    android:viewportHeight="20">
+    <group
+        android:translateX="-6"
+        android:translateY="-6">
+        <path
+            android:pathData="M8,21.5a8.6,8.6 0,1 1,16 0"
+            android:strokeWidth="2.4"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M16,18.2l4.8,-5.6"
+            android:strokeWidth="2.6"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M13.7,18.5a2.3,2.3 0,1 0,4.6 0a2.3,2.3 0,1 0,-4.6 0z" />
+    </group>
+</vector>

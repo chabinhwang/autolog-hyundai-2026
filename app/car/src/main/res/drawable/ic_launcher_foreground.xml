@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  앱 아이콘 앞 레이어: 계기판 바늘 (대시보드 LogoMark와 같은 도안, 32 격자).
+  32 격자를 108dp 중 가운데 72dp에 맞춰(×2.25, +18) 그림이 가운데 66dp 안전 영역 안에 들어가게 한다.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2.25"
+        android:scaleY="2.25"
+        android:translateX="18"
+        android:translateY="18">
+        <path
+            android:pathData="M8,21.5a8.6,8.6 0,1 1,16 0"
+            android:strokeWidth="2.4"
+            android:strokeColor="#FFFFFF"
+            android:strokeAlpha="0.45"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M16,18.2l4.8,-5.6"
+            android:strokeWidth="2.6"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M13.7,18.5a2.3,2.3 0,1 0,4.6 0a2.3,2.3 0,1 0,-4.6 0z" />
+    </group>
+</vector>
