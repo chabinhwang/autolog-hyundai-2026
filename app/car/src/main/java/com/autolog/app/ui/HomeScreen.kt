@@ -514,7 +514,7 @@ private fun route(trip: TripEntity): String {
     return "$from → $to"
 }
 
-private fun km(trip: TripEntity) = String.format(Locale.ROOT, "%.1fkm", trip.distanceKm)
+private fun km(trip: TripEntity) = Distance.tripKm(trip.odoStartKm, trip.odoEndKm)
 
 private fun syncLabel(trip: TripEntity) = when (trip.syncState) {
     SyncState.SYNCED -> "전송됨"
