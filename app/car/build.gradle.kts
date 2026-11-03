@@ -31,6 +31,14 @@ android {
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080\"")
             buildConfigField("int", "PARK_CONFIRM_SECONDS", "30")
         }
+        create("remoteDebug") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".remote"
+            versionNameSuffix = "-remote"
+            matchingFallbacks += listOf("debug")
+            // 운영 서버 검증은 별도 앱 데이터·기기 토큰을 사용한다.
+            buildConfigField("String", "API_BASE_URL", "\"https://autolog-api.aihub.io.kr\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
