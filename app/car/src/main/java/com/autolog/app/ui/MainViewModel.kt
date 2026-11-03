@@ -22,6 +22,8 @@ import com.autolog.app.purpose.PurposeEstimator
 import com.autolog.app.sync.SyncWorker
 import com.autolog.app.trip.TripRecorderService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -138,16 +141,62 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _message.value = "동의하지 않으면 이 직원으로 운행을 기록할 수 없어요."
     }
 
+    /** '확인이 필요한 운행'에서 고른 뒤 전송까지 기다리는 선택(운행 id → 선택). */
+    private val _pendingChoices = MutableStateFlow<Map<String, PendingChoice>>(emptyMap())
+    val pendingChoices: StateFlow<Map<String, PendingChoice>> = _pendingChoices.asStateFlow()
+    private val choiceJobs = mutableMapOf<String, Job>()
+
+    /**
+     * 고른 용도는 [PendingChoice.HOLD_MILLIS] 동안 '다시 선택'을 기다린 뒤 저장·전송한다.
+     * 화면을 닫아도 이어지도록 앱 범위에서 기다린다. 그 사이 앱이 종료되면 미확인으로 남아 다시 고를 수 있다.
+     */
     fun choosePurpose(trip: TripEntity, purpose: Purpose, category: BusinessCategory? = null) {
-        viewModelScope.launch {
-            container.tripRepository.changePurpose(trip.clientUuid, purpose, category)
+        val uuid = trip.clientUuid
+        choiceJobs.remove(uuid)?.cancel()
+        _pendingChoices.update { it + (uuid to PendingChoice(purpose, System.currentTimeMillis() + PendingChoice.HOLD_MILLIS)) }
+        choiceJobs[uuid] = container.appScope.launch {
+            delay(PendingChoice.HOLD_MILLIS)
+            container.tripRepository.changePurpose(uuid, purpose, category)
+            container.arrivalNotifications.cancel(uuid)
             SyncWorker.requestNow(getApplication())
+            _pendingChoices.update { it - uuid }
+            choiceJobs.remove(uuid)
         }
+    }
+
+    fun undoChoice(trip: TripEntity) {
+        choiceJobs.remove(trip.clientUuid)?.cancel()
+        _pendingChoices.update { it - trip.clientUuid }
     }
 
     /** 도착 질문 팝업에서 고른 답. 기록 서비스가 음성 대답보다 먼저 받으면 이것으로 확정한다. */
     fun answerArrival(choice: ArrivalChoice) {
         container.arrivalTaps.send(choice)
+    }
+
+    fun startManualTrip() {
+        container.manualTrips.start()
+    }
+
+    fun stopManualTrip() {
+        container.manualTrips.stop()
+    }
+
+    private val _syncCooldownUntil = MutableStateFlow(0L)
+    /** 동기화 버튼을 다시 누를 수 있는 시각(epoch ms). */
+    val syncCooldownUntil: StateFlow<Long> = _syncCooldownUntil.asStateFlow()
+
+    /** 수동 동기화. [SYNC_COOLDOWN_MS]에 한 번만 요청한다. */
+    fun syncNow() {
+        val now = System.currentTimeMillis()
+        if (now < _syncCooldownUntil.value) return
+        _syncCooldownUntil.value = now + SYNC_COOLDOWN_MS
+        SyncWorker.requestNow(getApplication())
+    }
+
+    /** 도착 확인 뒤 전송 대기 중 '다시 선택'. */
+    fun reselectArrival() {
+        container.arrivalTaps.reselect()
     }
 
     /** 지금 위치를 집으로 등록한다. 집 위치는 차량 안에만 저장한다(D2). */
@@ -205,5 +254,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val HOME_RADIUS_M = 200
+        const val SYNC_COOLDOWN_MS = 30_000L
     }
 }

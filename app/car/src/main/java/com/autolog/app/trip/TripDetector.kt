@@ -13,6 +13,7 @@ import java.time.Instant
  * - 시작: 기어 P(또는 모름) → D·R·N. 그 시점의 Odometer·위치·시각을 기록
  * - 종료 후보: 주행 중 기어 P 진입. 그 시점 값을 임시 저장
  * - 종료 확정: P가 [parkConfirm] 동안 유지. 그 전에 다시 출발하면 같은 트립으로 이어감
+ * - 수동 운행: [startManual]로 시작하면 기어를 무시하고 [stopManual]로만 끝낸다(기어 신호가 없는 차량·시연용)
  *
  * SDK에 의존하지 않는다. 호출 쪽(Foreground Service)이 이벤트를 순서대로 넣는다.
  * 같은 스레드에서만 호출한다.
@@ -23,7 +24,7 @@ class TripDetector(
 ) {
     sealed interface State {
         data object Idle : State
-        data class Driving(val start: VehicleSnapshot) : State
+        data class Driving(val start: VehicleSnapshot, val manual: Boolean = false) : State
         data class Parked(val start: VehicleSnapshot, val end: VehicleSnapshot) : State
     }
 
@@ -35,8 +36,11 @@ class TripDetector(
     var state: State = initial
         private set
 
-    private var lastOdometerKm: Double? = null
-    private var lastLocation: GeoPoint? = null
+    /** 마지막으로 받은 Odometer·위치. 수동 운행 중 시동이 꺼진 시점을 저장하는 데 쓴다. */
+    var lastOdometerKm: Double? = null
+        private set
+    var lastLocation: GeoPoint? = null
+        private set
 
     /** 최신 Odometer 값. 기어 변경 시점의 값으로 쓴다. */
     fun onOdometer(km: Double) {
@@ -59,13 +63,36 @@ class TripDetector(
                 null
             }
             is State.Driving -> {
-                if (gear == Gear.PARK) state = State.Parked(current.start, snapshot)
+                if (gear == Gear.PARK && !current.manual) state = State.Parked(current.start, snapshot)
                 null
             }
             is State.Parked -> {
                 if (gear.isMoving()) state = State.Driving(current.start)
                 null
             }
+        }
+    }
+
+    /** 수동 운행 시작. 이미 운행 중이거나 Odometer 값을 아직 모르면 null. */
+    fun startManual(at: Instant): Event? {
+        if (state != State.Idle) return null
+        val odo = lastOdometerKm ?: return null
+        val snapshot = VehicleSnapshot(at, odo, lastLocation)
+        state = State.Driving(snapshot, manual = true)
+        return Event.TripStarted(snapshot)
+    }
+
+    /** 운행 종료 버튼. 주행 중이면 지금 값으로, 정차 확인 중이면 P 진입 값으로 바로 확정한다. */
+    fun stopManual(at: Instant): Event? = when (val current = state) {
+        State.Idle -> null
+        is State.Driving -> {
+            val odo = lastOdometerKm ?: current.start.odometerKm
+            state = State.Idle
+            Event.TripCompleted(DetectedTrip(current.start, VehicleSnapshot(at, odo, lastLocation)))
+        }
+        is State.Parked -> {
+            state = State.Idle
+            Event.TripCompleted(DetectedTrip(current.start, current.end))
         }
     }
 

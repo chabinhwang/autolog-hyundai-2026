@@ -66,6 +66,10 @@ class FakeTripDao : TripDao {
         rows.map { it.values.sortedByDescending { t -> t.startedAt }.take(limit) }
     override fun observeUnconfirmed(): Flow<List<TripEntity>> =
         rows.map { it.values.filter { t -> t.purpose == Purpose.UNCONFIRMED && !t.answerPending } }
+
+    override suspend fun latestUnconfirmed() =
+        rows.value.values.filter { it.purpose == Purpose.UNCONFIRMED && !it.answerPending }.maxByOrNull { it.endedAt }
+
     override fun observePendingCount(): Flow<Int> = rows.map { it.values.count { t -> t.syncState == SyncState.PENDING } }
     override suspend fun countPendingForOtherVehicles(vehicleId: Long) =
         rows.value.values.count { it.syncState == SyncState.PENDING && it.vehicleId != vehicleId }
@@ -79,6 +83,11 @@ class FakeTripDao : TripDao {
     override suspend fun updatePurpose(uuid: String, purpose: Purpose, source: PurposeSource, category: BusinessCategory?) {
         val t = rows.value[uuid] ?: return
         put(t.copy(purpose = purpose, purposeSource = source, businessCategory = category, answerPending = false, localVersion = t.localVersion + 1))
+    }
+
+    override suspend fun holdPurpose(uuid: String, purpose: Purpose, source: PurposeSource, category: BusinessCategory?) {
+        val t = rows.value[uuid] ?: return
+        put(t.copy(purpose = purpose, purposeSource = source, businessCategory = category, answerPending = true, localVersion = t.localVersion + 1))
     }
 
     override suspend fun extendEnd(

@@ -29,15 +29,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.autolog.app.data.local.DriverEntity
 import com.autolog.app.data.local.TripEntity
 import com.autolog.app.data.settings.PairedVehicleInfo
 import com.autolog.app.domain.Purpose
+import com.autolog.app.domain.PurposeSource
 import com.autolog.app.domain.SyncState
 import com.autolog.app.export.CsvExporter
+import com.autolog.app.purpose.PurposeDecision
 import com.autolog.app.purpose.PurposeEstimator
 import com.autolog.app.trip.TripRecorder
 import java.time.LocalDate
@@ -57,6 +58,10 @@ data class HomeState(
     val pendingCount: Int,
     val failedCount: Int,
     val unconfirmed: List<TripEntity>,
+    /** 고른 뒤 전송을 기다리는 미확인 운행(운행 id → 선택). */
+    val pendingChoices: Map<String, PendingChoice>,
+    /** 동기화 버튼을 다시 누를 수 있는 시각(epoch ms). */
+    val syncCooldownUntil: Long,
     val recent: List<TripEntity>,
     val homeRegistered: Boolean,
     val month: YearMonth,
@@ -66,6 +71,10 @@ data class HomeState(
 data class HomeActions(
     val pickDriver: () -> Unit,
     val choosePurpose: (TripEntity, Purpose) -> Unit,
+    val undoChoice: (TripEntity) -> Unit,
+    val startManualTrip: () -> Unit,
+    val stopManualTrip: () -> Unit,
+    val syncNow: () -> Unit,
     val registerHome: () -> Unit,
     val exportCsv: () -> Unit,
     val repair: () -> Unit,
@@ -86,18 +95,19 @@ private fun TwoPane(state: HomeState, actions: HomeActions) {
             Header(state, actions)
             if (state.unconfirmed.isEmpty()) {
                 // 할 일이 없으면 상태 카드를 키워 자동 기록 방식을 함께 보여준다.
-                StatusCard(state.status, Modifier.weight(1f), showGuide = true)
+                StatusCard(state.status, actions, showGuide = true)
                 AllClearCard()
+                Spacer(Modifier.weight(1f))
             } else {
-                StatusCard(state.status)
-                UnconfirmedCard(state.unconfirmed, actions.choosePurpose, Modifier.weight(1f))
+                StatusCard(state.status, actions)
+                UnconfirmedCard(state.unconfirmed, state.pendingChoices, actions, Modifier.weight(1f))
             }
             ActionRow(state.homeRegistered, actions)
         }
         Column(Modifier.weight(1.1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
             SummaryCard(state.month, state.summary)
             PleosCard(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(start = 36.dp, top = 32.dp, end = 36.dp)) {
-                RecentHeader(state.pendingCount, state.failedCount)
+                RecentHeader(state.pendingCount, state.failedCount, state.syncCooldownUntil, actions.syncNow)
                 Spacer(Modifier.height(8.dp))
                 if (state.recent.isEmpty()) {
                     EmptyRecent()
@@ -122,15 +132,17 @@ private fun OnePane(state: HomeState, actions: HomeActions) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         item { Header(state, actions) }
-        item { StatusCard(state.status) }
+        item { StatusCard(state.status, actions) }
         if (state.unconfirmed.isEmpty()) {
             item { AllClearCard() }
         } else {
             item { UnconfirmedTitle(state.unconfirmed.size) }
-            items(state.unconfirmed, key = { "u-" + it.clientUuid }) { trip -> UnconfirmedItem(trip, actions.choosePurpose) }
+            items(state.unconfirmed, key = { "u-" + it.clientUuid }) { trip ->
+                UnconfirmedItem(trip, state.pendingChoices[trip.clientUuid], actions)
+            }
         }
         item { SummaryCard(state.month, state.summary) }
-        item { RecentHeader(state.pendingCount, state.failedCount) }
+        item { RecentHeader(state.pendingCount, state.failedCount, state.syncCooldownUntil, actions.syncNow) }
         if (state.recent.isEmpty()) item { EmptyRecent() } else recentItems(state.recent.take(30))
         item { ActionRow(state.homeRegistered, actions) }
     }
@@ -173,19 +185,24 @@ private fun Avatar(name: String) {
 private data class PhaseLook(val title: String, val hint: String, val step: Int)
 
 @Composable
-private fun StatusCard(status: TripRecorder.Status, modifier: Modifier = Modifier, showGuide: Boolean = false) {
+private fun StatusCard(status: TripRecorder.Status, actions: HomeActions, modifier: Modifier = Modifier, showGuide: Boolean = false) {
     val colors = AutoLogColors
     val look = when (status.phase) {
         TripRecorder.Phase.IDLE -> PhaseLook("운행 대기 중", "기어를 D로 바꾸면 자동으로 기록해요.", 0)
-        TripRecorder.Phase.DRIVING -> PhaseLook("운행 기록 중", "도착해서 P에 세우면 용도를 한 번 물어볼게요.", 1)
+        TripRecorder.Phase.DRIVING -> if (status.manual) {
+            PhaseLook("운행 기록 중 (수동)", "도착하면 '운행 종료'를 눌러 주세요.", 1)
+        } else {
+            PhaseLook("운행 기록 중", "도착해서 P에 세우면 용도를 한 번 물어볼게요.", 1)
+        }
         TripRecorder.Phase.PARKED -> PhaseLook("정차 확인 중", "P로 잠시 서 있으면 운행을 마무리해요. 바로 다시 출발하면 같은 운행으로 이어져요.", 2)
         TripRecorder.Phase.ASKING -> PhaseLook("도착 확인 중", "말로 대답하거나(\"네\"·\"업무\"·\"개인\") 화면에서 골라 주세요.", 3)
+        TripRecorder.Phase.CONFIRMING -> PhaseLook("전송 대기 중", "곧 서버로 전송해요. 바꾸려면 '다시 선택'을 눌러 주세요.", 3)
     }
     val accent = when (status.phase) {
         TripRecorder.Phase.IDLE -> colors.personal
         TripRecorder.Phase.DRIVING -> colors.active
         TripRecorder.Phase.PARKED -> colors.caution
-        TripRecorder.Phase.ASKING -> colors.positive
+        TripRecorder.Phase.ASKING, TripRecorder.Phase.CONFIRMING -> colors.positive
     }
     PleosCard(
         modifier.fillMaxWidth(),
@@ -194,7 +211,7 @@ private fun StatusCard(status: TripRecorder.Status, modifier: Modifier = Modifie
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(28.dp).background(accent, CircleShape))
             Spacer(Modifier.width(24.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(look.title, style = PleosType.TitleLarge, color = colors.text)
                 Text(
                     // 대기 중이면 마지막 결과(확정 안내·기록 안 함 사유)를, 진행 중이면 지금 할 일을 보여준다.
@@ -204,6 +221,17 @@ private fun StatusCard(status: TripRecorder.Status, modifier: Modifier = Modifie
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+            // 기어 신호 없이 기록하는 수동 운행(시작·종료 모두 버튼).
+            when {
+                status.phase == TripRecorder.Phase.IDLE -> {
+                    Spacer(Modifier.width(16.dp))
+                    PleosButton("운행 시작", actions.startManualTrip)
+                }
+                status.phase == TripRecorder.Phase.DRIVING && status.manual -> {
+                    Spacer(Modifier.width(16.dp))
+                    PleosButton("운행 종료", actions.stopManualTrip, style = ButtonStyle.Filled)
+                }
             }
         }
         status.prompt?.takeIf { status.phase == TripRecorder.Phase.ASKING }?.let { prompt ->
@@ -216,32 +244,32 @@ private fun StatusCard(status: TripRecorder.Status, modifier: Modifier = Modifie
             )
         }
         if (showGuide) {
-            Spacer(Modifier.height(32.dp))
-            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                GuideStep(1, "기어 D", "자동으로 기록 시작", look.step == 1, Modifier.weight(1f))
-                GuideStep(2, "도착", "용도를 음성으로 질문", look.step == 2, Modifier.weight(1f))
-                GuideStep(3, "대답", "한마디면 기록 완료", look.step == 3, Modifier.weight(1f))
+            Spacer(Modifier.height(24.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                GuideStep(1, "출발", "출발하면 자동으로 운행 기록을 시작해요.", look.step == 1)
+                GuideStep(2, "도착", "도착하면 운행 용도를 팝업이나 음성으로 입력할 수 있어요.", look.step == 2)
+                GuideStep(3, "선택", "운행 용도를 선택하면 서버로 전송해요.", look.step == 3)
             }
         }
     }
 }
 
 @Composable
-private fun GuideStep(number: Int, title: String, body: String, current: Boolean, modifier: Modifier) {
+private fun GuideStep(number: Int, title: String, body: String, current: Boolean) {
     val colors = AutoLogColors
-    Column(
-        modifier.fillMaxHeight().clip(RoundedCornerShape(24.dp))
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
             .background(if (current) colors.surface else colors.surfaceHigh)
-            .then(if (current) Modifier.border(3.dp, colors.positive, RoundedCornerShape(24.dp)) else Modifier)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .then(if (current) Modifier.border(3.dp, colors.positive, RoundedCornerShape(20.dp)) else Modifier)
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(64.dp).background(colors.positive, CircleShape), contentAlignment = Alignment.Center) {
-            Text(number.toString(), style = PleosType.TitleSmall, color = androidx.compose.ui.graphics.Color.White)
+        Box(Modifier.size(44.dp).background(colors.positive, CircleShape), contentAlignment = Alignment.Center) {
+            Text(number.toString(), style = PleosType.BodyMediumStrong, color = androidx.compose.ui.graphics.Color.White)
         }
-        Text(title, style = PleosType.TitleSmall, color = colors.text, maxLines = 1)
-        Text(body, style = PleosType.BodySmall, color = colors.textTertiary, maxLines = 2, textAlign = TextAlign.Center)
+        Spacer(Modifier.width(20.dp))
+        Text(title, style = PleosType.BodyMediumStrong, color = colors.text, maxLines = 1, modifier = Modifier.width(72.dp))
+        Text(body, style = PleosType.BodySmall, color = colors.textTertiary, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -262,6 +290,24 @@ private fun AllClearCard() {
     }
 }
 
+/** 고른 용도와 전송까지 남은 시간, '다시 선택' 버튼. */
+@Composable
+private fun PendingChoiceRow(pending: PendingChoice, onUndo: () -> Unit) {
+    val seconds = rememberSecondsLeft(pending.sendAtMillis)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                TripRecorder.confirmation(PurposeDecision(pending.purpose, PurposeSource.MANUAL, null)),
+                style = PleosType.BodyLargeStrong,
+                color = AutoLogColors.text,
+            )
+            Text("${seconds}초 뒤 서버로 전송해요.", style = PleosType.BodySmall, color = AutoLogColors.textTertiary)
+        }
+        Spacer(Modifier.width(16.dp))
+        PleosButton("다시 선택", onUndo)
+    }
+}
+
 @Composable
 private fun UnconfirmedTitle(count: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -271,7 +317,7 @@ private fun UnconfirmedTitle(count: Int) {
 }
 
 @Composable
-private fun UnconfirmedCard(trips: List<TripEntity>, choose: (TripEntity, Purpose) -> Unit, modifier: Modifier) {
+private fun UnconfirmedCard(trips: List<TripEntity>, pending: Map<String, PendingChoice>, actions: HomeActions, modifier: Modifier) {
     PleosCard(modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 32.dp, top = 32.dp, end = 32.dp)) {
         UnconfirmedTitle(trips.size)
         Spacer(Modifier.height(20.dp))
@@ -280,14 +326,15 @@ private fun UnconfirmedCard(trips: List<TripEntity>, choose: (TripEntity, Purpos
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(bottom = 32.dp),
         ) {
-            items(trips, key = { it.clientUuid }) { trip -> UnconfirmedItem(trip, choose) }
+            items(trips, key = { it.clientUuid }) { trip -> UnconfirmedItem(trip, pending[trip.clientUuid], actions) }
         }
     }
 }
 
 /** 미확인 한 건: 언제·어디서 어디로·거리, 그리고 용도 세 버튼. */
 @Composable
-private fun UnconfirmedItem(trip: TripEntity, choose: (TripEntity, Purpose) -> Unit) {
+private fun UnconfirmedItem(trip: TripEntity, pending: PendingChoice?, actions: HomeActions) {
+    val choose = actions.choosePurpose
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(AutoLogColors.surfaceHigh).padding(28.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -300,10 +347,14 @@ private fun UnconfirmedItem(trip: TripEntity, choose: (TripEntity, Purpose) -> U
             Spacer(Modifier.width(16.dp))
             Text(km(trip), style = PleosType.TitleSmall, color = AutoLogColors.text)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            PleosButton("출퇴근", { choose(trip, Purpose.COMMUTE) }, Modifier.weight(1f), style = ButtonStyle.Tinted(AutoLogColors.autonomous))
-            PleosButton("업무", { choose(trip, Purpose.BUSINESS) }, Modifier.weight(1f), style = ButtonStyle.Tinted(AutoLogColors.positive))
-            PleosButton("개인", { choose(trip, Purpose.PERSONAL) }, Modifier.weight(1f), style = ButtonStyle.Basic)
+        if (pending != null) {
+            PendingChoiceRow(pending) { actions.undoChoice(trip) }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                PleosButton("출퇴근", { choose(trip, Purpose.COMMUTE) }, Modifier.weight(1f), style = ButtonStyle.Tinted(AutoLogColors.autonomous))
+                PleosButton("업무", { choose(trip, Purpose.BUSINESS) }, Modifier.weight(1f), style = ButtonStyle.Tinted(AutoLogColors.positive))
+                PleosButton("개인", { choose(trip, Purpose.PERSONAL) }, Modifier.weight(1f), style = ButtonStyle.Basic)
+            }
         }
     }
 }
@@ -352,7 +403,8 @@ private fun Stat(label: String, value: String, modifier: Modifier, highlight: Bo
 }
 
 @Composable
-private fun RecentHeader(pendingCount: Int, failedCount: Int) {
+private fun RecentHeader(pendingCount: Int, failedCount: Int, syncCooldownUntil: Long, onSync: () -> Unit) {
+    val waitSeconds = rememberSecondsLeft(syncCooldownUntil)
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("최근 운행", style = PleosType.TitleSmall, color = AutoLogColors.text, modifier = Modifier.weight(1f))
         when {
@@ -363,6 +415,13 @@ private fun RecentHeader(pendingCount: Int, failedCount: Int) {
             pendingCount > 0 -> StatusChip("전송 대기 ${pendingCount}건", AutoLogColors.caution)
             else -> StatusChip("모두 전송됨", AutoLogColors.active)
         }
+        // 서버와 바로 동기화(전송·설정 받기). 30초에 한 번만 누를 수 있다.
+        PleosButton(
+            if (waitSeconds > 0) "${waitSeconds}초 후" else "동기화",
+            onSync,
+            size = ButtonSize.Small,
+            enabled = waitSeconds == 0L,
+        )
     }
 }
 

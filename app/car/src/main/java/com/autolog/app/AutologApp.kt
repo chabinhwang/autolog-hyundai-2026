@@ -52,6 +52,12 @@ class AppContainer(context: Context) {
     /** 도착 질문 팝업에서 누른 버튼. 화면이 보내고 기록 서비스가 받는다. */
     val arrivalTaps = com.autolog.app.trip.ArrivalTaps()
 
+    /** 화면의 운행 시작·종료 버튼. 화면이 보내고 기록 서비스가 받는다. */
+    val manualTrips = com.autolog.app.trip.ManualTripControl()
+
+    /** 도착 질문을 알림 센터에도 남기는 알림(버튼으로 바로 고를 수 있음). */
+    val arrivalNotifications: com.autolog.app.trip.ArrivalNotifications = com.autolog.app.trip.AndroidArrivalNotifications(appContext)
+
     val tripRepository = TripRepository(database.tripDao(), database.tripEditDao(), database.placeDao())
     val consentRepository = ConsentRepository(database.consentDao(), settings)
 

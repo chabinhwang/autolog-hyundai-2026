@@ -29,6 +29,9 @@ interface TripDao {
     @Query("SELECT * FROM trip WHERE purpose = 'UNCONFIRMED' AND answerPending = 0 ORDER BY startedAt DESC")
     fun observeUnconfirmed(): Flow<List<TripEntity>>
 
+    @Query("SELECT * FROM trip WHERE purpose = 'UNCONFIRMED' AND answerPending = 0 ORDER BY endedAt DESC LIMIT 1")
+    suspend fun latestUnconfirmed(): TripEntity?
+
     @Query("SELECT COUNT(*) FROM trip WHERE syncState = 'PENDING'")
     fun observePendingCount(): Flow<Int>
 
@@ -49,6 +52,13 @@ interface TripDao {
            answerPending = 0, localVersion = localVersion + 1 WHERE clientUuid = :uuid""",
     )
     suspend fun updatePurpose(uuid: String, purpose: Purpose, source: PurposeSource, category: BusinessCategory?)
+
+    /** 용도는 저장하되 답변 대기(업로드 제외)는 유지한다. 도착 확인 뒤 '다시 선택' 대기 시간 동안 쓴다. */
+    @Query(
+        """UPDATE trip SET purpose = :purpose, purposeSource = :source, businessCategory = :category,
+           answerPending = 1, localVersion = localVersion + 1 WHERE clientUuid = :uuid""",
+    )
+    suspend fun holdPurpose(uuid: String, purpose: Purpose, source: PurposeSource, category: BusinessCategory?)
 
     @Query(
         """UPDATE trip SET endedAt = :endedAt, odoEndKm = :odoEndKm, destType = :destType, destPlaceId = :destPlaceId,

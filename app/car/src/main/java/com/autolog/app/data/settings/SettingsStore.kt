@@ -40,6 +40,15 @@ data class OngoingTrip(
     val odoParkedKm: Double? = null,
     val parkedLat: Double? = null,
     val parkedLng: Double? = null,
+    /** 운행 시작 버튼으로 시작한 운행. 기어를 무시하고 종료 버튼으로만 끝난다. */
+    val manual: Boolean = false,
+    /** 수동 운행 중 마지막으로 확인한 시각·계기판 거리·위치(30초마다). 시동이 꺼진 시점을 추정하는 데 쓴다. */
+    val lastSeenAtMillis: Long? = null,
+    val lastSeenOdoKm: Double? = null,
+    val lastSeenLat: Double? = null,
+    val lastSeenLng: Double? = null,
+    /** 출발지가 등록 장소가 아닐 때 붙일 동 이름(내비 주소). */
+    val originArea: String? = null,
 )
 
 /**
@@ -55,6 +64,7 @@ class SettingsStore(private val context: Context, private val cipher: KeystoreCi
         val CONSENT_VERSION = stringPreferencesKey("consent_version")
         val CURRENT_DRIVER = longPreferencesKey("current_driver_id")
         val ONGOING_TRIP = stringPreferencesKey("ongoing_trip_json")
+        val LAST_REASKED_TRIP = stringPreferencesKey("last_reasked_trip_uuid")
     }
 
     private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
@@ -140,5 +150,11 @@ class SettingsStore(private val context: Context, private val cipher: KeystoreCi
         context.dataStore.edit { prefs ->
             if (trip == null) prefs.remove(Keys.ONGOING_TRIP) else prefs[Keys.ONGOING_TRIP] = json.encodeToString(OngoingTrip.serializer(), trip)
         }
+    }
+
+    override suspend fun lastReaskedTrip(): String? = context.dataStore.data.first()[Keys.LAST_REASKED_TRIP]
+
+    override suspend fun saveLastReaskedTrip(uuid: String) {
+        context.dataStore.edit { it[Keys.LAST_REASKED_TRIP] = uuid }
     }
 }

@@ -53,7 +53,7 @@ cd app
 ./gradlew :car:installDebug         # 실행 중인 Pleos Connect AVD에 설치
 ```
 
-Android Studio에서 `app/` 폴더를 열어도 됩니다. Android SDK 경로는 `app/local.properties`의 `sdk.dir` (이 PC는 `~/Library/Android/sdk`) 또는 `ANDROID_HOME`으로 지정합니다. debug APK는 `app/car/build/outputs/apk/debug/`에 생성됩니다. 차량 앱 단위 테스트 97개·lint 오류 0 **확인됨 (2026-11-02)**.
+Android Studio에서 `app/` 폴더를 열어도 됩니다. Android SDK 경로는 `app/local.properties`의 `sdk.dir` (이 PC는 `~/Library/Android/sdk`) 또는 `ANDROID_HOME`으로 지정합니다. debug APK는 `app/car/build/outputs/apk/debug/`에 생성됩니다. 차량 앱 단위 테스트 113개·lint 오류 0 **확인됨 (2026-11-02)**.
 
 화면은 [Pleos Connect 디자인 가이드](https://document.pleos.ai/docs/connect/guide/docs-design/Introduction/intro)의 색 토큰·글자 위계·버튼·팝업 기준을 적용하고 시스템 라이트/다크 설정을 따릅니다. 앱 창 너비 1200dp 이상은 두 단, 그보다 좁은 창·세로 분할 창은 한 단으로 배치합니다. 이번 달 요약은 운행 수·총 주행거리·업무사용비율(`(출퇴근 거리 + 업무 거리) ÷ 총 주행거리 × 100`)을 표시하며 음성 답변 대기 트립은 제외합니다. 다시 등록 화면에서 시스템 뒤로가기는 취소 후 홈 복귀입니다. 라이트/다크·미확인 3버튼·이용자 선택/다시 등록 팝업·등록 코드·세로 분할 창 정상 동작은 사용자 AVD 실측으로 **확인됨 (2026-11-02, 3dfe60f·08e850e)**.
 

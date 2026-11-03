@@ -3,6 +3,7 @@
     <string name="app_name">AutoLog</string>
 
     <string name="recorder_channel">운행 기록</string>
+    <string name="arrival_channel">도착 확인</string>
     <string name="recorder_idle">운행을 기다리는 중</string>
     <string name="recorder_driving">운행 기록 중</string>
 </resources>

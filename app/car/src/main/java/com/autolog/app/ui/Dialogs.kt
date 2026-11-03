@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.autolog.app.data.local.DriverEntity
 import com.autolog.app.domain.Purpose
 import com.autolog.app.purpose.ArrivalChoice
+import com.autolog.app.trip.TripRecorder
 
 /** 이용자 선택. 공용차는 탈 때마다 고른다(기본값: 마지막 사용자). */
 @Composable
@@ -93,7 +94,7 @@ fun ConsentDialog(driver: DriverEntity, onAccept: () -> Unit, onDecline: () -> U
         ) {
             Item(
                 "어떤 정보를 기록하나요",
-                "운행 날짜, 출발·도착 때의 계기판 거리, 출발지·도착지 이름(회사·거래처·집·내비 목적지), 운행 용도와 메모, 운전한 사람(부서·이름)을 기록해요.",
+                "운행 날짜, 출발·도착 때의 계기판 거리, 출발지·도착지 이름(회사·거래처·집, 그 밖에는 동 이름), 운행 용도와 메모, 운전한 사람(부서·이름)을 기록해요.",
             )
             Item("차량 밖으로 보내지 않아요", "정확한 위치(좌표)와 집 위치는 차량 안에만 두고 서버로 보내지 않아요.")
             Item("관리자에게는 이만큼 보여요", "개인 운행은 날짜와 거리만 보여요. 장소·시각·메모는 관리자도 볼 수 없어요.")
@@ -116,22 +117,35 @@ private fun Item(title: String, body: String) {
 
 /**
  * 도착 질문 팝업 (car-app.md §3). 음성으로 묻는 동안 같은 질문을 띄우고, 말하거나 버튼을 누르는 것 중 먼저 들어온 답으로 기록한다.
+ * 용도를 정하면 전송 전까지 남은 시간과 '다시 선택'을 보여준다(CONFIRMING).
  * 정차(P) 확인 뒤에만 뜨므로 화면 조작이 가능하다. 바깥을 눌러도 닫지 않는다(음성 무응답이면 기록 서비스가 닫는다).
  */
 @Composable
-fun ArrivalDialog(prompt: String, suggested: Purpose?, onChoose: (ArrivalChoice) -> Unit) {
+fun ArrivalDialog(status: TripRecorder.Status, onChoose: (ArrivalChoice) -> Unit, onReselect: () -> Unit) {
+    val sendAt = status.sendAtMillis
+    if (status.phase == TripRecorder.Phase.CONFIRMING && sendAt != null) {
+        val seconds = rememberSecondsLeft(sendAt)
+        PleosPopup(
+            title = status.lastMessage ?: "기록했어요",
+            description = "${seconds}초 뒤 서버로 전송해요.",
+            onDismiss = {},
+            large = true,
+            confirm = "다시 선택" to onReselect,
+        )
+        return
+    }
     PleosPopup(
-        title = "도착했어요",
-        description = prompt,
+        title = if (status.previousTrip) "지난 운행 확인" else "도착했어요",
+        description = status.prompt,
         onDismiss = {},
         large = true,
         dismiss = "나중에 고를게요" to { onChoose(ArrivalChoice.LATER) },
     ) {
         Text("말로 대답하거나 아래에서 골라 주세요.", style = PleosType.BodySmall, color = AutoLogColors.textTertiary)
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ArrivalButton("출퇴근", Purpose.COMMUTE, suggested, AutoLogColors.autonomous) { onChoose(ArrivalChoice.COMMUTE) }
-            ArrivalButton("업무", Purpose.BUSINESS, suggested, AutoLogColors.positive) { onChoose(ArrivalChoice.BUSINESS) }
-            ArrivalButton("개인", Purpose.PERSONAL, suggested, null) { onChoose(ArrivalChoice.PERSONAL) }
+            ArrivalButton("출퇴근", Purpose.COMMUTE, status.suggested, AutoLogColors.autonomous) { onChoose(ArrivalChoice.COMMUTE) }
+            ArrivalButton("업무", Purpose.BUSINESS, status.suggested, AutoLogColors.positive) { onChoose(ArrivalChoice.BUSINESS) }
+            ArrivalButton("개인", Purpose.PERSONAL, status.suggested, null) { onChoose(ArrivalChoice.PERSONAL) }
         }
     }
 }

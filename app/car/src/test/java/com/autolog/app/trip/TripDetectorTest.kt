@@ -116,4 +116,34 @@ class TripDetectorTest {
         val completed = restored.onTick(at(400)) as TripDetector.Event.TripCompleted
         assertEquals(10.0, completed.trip.distanceKm, 1e-9)
     }
+
+    @Test
+    fun `수동 운행은 기어 P를 무시하고 종료 버튼으로만 끝난다`() {
+        val d = detector()
+        d.onOdometer(100.0)
+        assertTrue(d.startManual(at(0)) is TripDetector.Event.TripStarted)
+        assertEquals(true, (d.state as TripDetector.State.Driving).manual)
+
+        d.onOdometer(105.5)
+        assertNull(d.onGear(Gear.PARK, at(60)))
+        assertNull(d.onTick(at(600)))
+        assertTrue(d.state is TripDetector.State.Driving)
+
+        val completed = d.stopManual(at(700)) as TripDetector.Event.TripCompleted
+        assertEquals(5.5, completed.trip.distanceKm, 1e-9)
+        assertEquals(at(700), completed.trip.end.at)
+        assertEquals(TripDetector.State.Idle, d.state)
+    }
+
+    @Test
+    fun `운행 중이거나 Odometer를 모르면 수동 시작하지 않는다`() {
+        val unknown = detector()
+        assertNull(unknown.startManual(at(0)))
+
+        val driving = detector()
+        driving.onOdometer(10.0)
+        driving.onGear(Gear.DRIVE, at(0))
+        assertNull(driving.startManual(at(5)))
+        assertNull(detector().stopManual(at(0)))
+    }
 }

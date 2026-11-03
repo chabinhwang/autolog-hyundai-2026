@@ -115,6 +115,8 @@ private fun Home(viewModel: MainViewModel, onRepair: () -> Unit) {
     val pending by viewModel.pendingCount.collectAsState()
     val failed by viewModel.failedCount.collectAsState()
     val unconfirmed by viewModel.unconfirmed.collectAsState()
+    val pendingChoices by viewModel.pendingChoices.collectAsState()
+    val syncCooldownUntil by viewModel.syncCooldownUntil.collectAsState()
     val recent by viewModel.recentTrips.collectAsState()
     val places by viewModel.places.collectAsState()
     val consentFor by viewModel.consentFor.collectAsState()
@@ -131,6 +133,8 @@ private fun Home(viewModel: MainViewModel, onRepair: () -> Unit) {
             pendingCount = pending,
             failedCount = failed,
             unconfirmed = unconfirmed,
+            pendingChoices = pendingChoices,
+            syncCooldownUntil = syncCooldownUntil,
             recent = recent,
             homeRegistered = places.any { it.type == EndpointType.HOME },
             month = monthSummary.first,
@@ -139,6 +143,10 @@ private fun Home(viewModel: MainViewModel, onRepair: () -> Unit) {
         actions = HomeActions(
             pickDriver = { picking = true },
             choosePurpose = { trip, purpose -> viewModel.choosePurpose(trip, purpose) },
+            undoChoice = viewModel::undoChoice,
+            startManualTrip = viewModel::startManualTrip,
+            stopManualTrip = viewModel::stopManualTrip,
+            syncNow = viewModel::syncNow,
             registerHome = viewModel::registerHomeHere,
             exportCsv = viewModel::exportThisMonth,
             repair = { scope.launch { repairWarning = viewModel.pendingBeforeRepair() } },
@@ -167,7 +175,7 @@ private fun Home(viewModel: MainViewModel, onRepair: () -> Unit) {
         )
     }
     // 도착 질문은 다른 팝업 위에 띄운다(음성과 함께 답을 받는 중). 마지막에 그려야 위에 온다.
-    status.prompt?.takeIf { status.phase == TripRecorder.Phase.ASKING }?.let { prompt ->
-        ArrivalDialog(prompt, status.suggested, viewModel::answerArrival)
+    if (status.phase == TripRecorder.Phase.ASKING || status.phase == TripRecorder.Phase.CONFIRMING) {
+        ArrivalDialog(status, viewModel::answerArrival, viewModel::reselectArrival)
     }
 }

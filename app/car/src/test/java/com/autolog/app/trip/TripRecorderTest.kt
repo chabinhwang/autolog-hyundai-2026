@@ -85,6 +85,11 @@ class TripRecorderTest {
 
     private class FakeSettings(var vehicle: PairedVehicleInfo?) : RecorderSettings {
         var ongoing: OngoingTrip? = null
+        var reasked: String? = null
+        override suspend fun lastReaskedTrip() = reasked
+        override suspend fun saveLastReaskedTrip(uuid: String) {
+            reasked = uuid
+        }
         override suspend fun vehicleNow() = vehicle
         override suspend fun currentDriverNow() = 11L
         override suspend fun ongoingTrip() = ongoing
@@ -108,7 +113,17 @@ class TripRecorderTest {
     @After
     fun tearDown() = scope.cancel()
 
-    private fun recorder(voice: VoiceIO, settings: RecorderSettings, taps: ArrivalTaps = ArrivalTaps()): TripRecorder {
+    private fun recorder(
+        voice: VoiceIO,
+        settings: RecorderSettings,
+        taps: ArrivalTaps = ArrivalTaps(),
+        undoWindowMs: Long = 150,
+        manual: ManualTripControl = ManualTripControl(),
+        reaskDelayMs: Long = 60_000,
+        heartbeatMs: Long = 30_000,
+        notifications: ArrivalNotifications = ArrivalNotifications.None,
+        areaNames: com.autolog.app.location.AreaNameSource = com.autolog.app.location.AreaNameSource.None,
+    ): TripRecorder {
         runBlocking {
             places.upsert(PlaceEntity(0, 1, "본사", EndpointType.COMPANY, COMPANY.lat, COMPANY.lng, 200, false))
             places.upsert(PlaceEntity(0, null, "집", EndpointType.HOME, HOME.lat, HOME.lng, 200, false))
@@ -119,6 +134,8 @@ class TripRecorderTest {
             repository = TripRepository(trips, FakeEditDao(), places, clock),
             settings = settings, requestSync = { syncRequests++ },
             parkConfirm = Duration.ofMillis(300), taps = taps, clock = clock, tickMs = 50, answerTimeoutMs = 100,
+            undoWindowMs = undoWindowMs, manual = manual, reaskDelayMs = reaskDelayMs, heartbeatMs = heartbeatMs,
+            notifications = notifications, areaNames = areaNames,
         )
     }
 
@@ -290,6 +307,249 @@ class TripRecorderTest {
         val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
         assertEquals(Purpose.COMMUTE, saved.purpose)
         assertEquals(PurposeSource.VOICE, saved.purposeSource)
+    }
+
+    @Test
+    fun `용도를 정하면 전송 대기 동안 업로드에서 빼 두었다가 대기가 끝나면 전송한다`() = runBlocking {
+        val voice = FakeVoice("응")
+        val recorder = recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)), undoWindowMs = 600)
+        recorder.start(scope)
+        delay(200)
+
+        drive(100.0, 112.4, COMPANY)
+
+        val confirming = withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.CONFIRMING } }
+        assertEquals("출퇴근으로 기록했어요.", confirming.lastMessage)
+        assertTrue(confirming.sendAtMillis != null)
+        val held = trips.rows.value.values.single()
+        assertEquals(Purpose.COMMUTE, held.purpose)
+        assertTrue("전송 대기 중에는 업로드 대상이 아니다", held.answerPending)
+        val syncBefore = syncRequests
+
+        val released = withTimeout(3_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(Purpose.COMMUTE, released.purpose)
+        withTimeout(1_000) { while (syncRequests == syncBefore) delay(20) }
+    }
+
+    @Test
+    fun `전송 대기 중 다시 선택을 누르면 다시 골라 그 값으로 전송한다`() = runBlocking {
+        val voice = FakeVoice("응").apply { listenDelayMs = 300 }
+        val taps = ArrivalTaps()
+        val recorder = recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)), taps, undoWindowMs = 2_000)
+        recorder.start(scope)
+        delay(200)
+
+        drive(100.0, 112.4, COMPANY)
+
+        withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.CONFIRMING } }
+        taps.reselect()
+        val again = withTimeout(1_000) { recorder.status.first { it.phase == TripRecorder.Phase.ASKING } }
+        assertEquals("본사 도착, 12.4킬로미터. 출근으로 기록할까요?", again.prompt)
+        taps.send(ArrivalChoice.PERSONAL)
+        val confirming = withTimeout(1_000) { recorder.status.first { it.phase == TripRecorder.Phase.CONFIRMING } }
+        assertEquals("개인 운행으로 기록했어요.", confirming.lastMessage)
+
+        val saved = withTimeout(4_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(Purpose.PERSONAL, saved.purpose)
+        assertEquals(PurposeSource.MANUAL, saved.purposeSource)
+        assertEquals("다시 고를 때 질문을 다시 읽지 않는다", 1, voice.spoken.count { it.startsWith("본사 도착") })
+    }
+
+    /** 50분 전 회사에 P로 세우고 시동을 끈 상태(정차 확인 전)로 저장돼 있던 운행. */
+    private fun parkedLongAgo() = FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)).apply {
+        ongoing = OngoingTrip(
+            Instant.parse("2026-11-02T22:00:00Z").toEpochMilli(), 90.0, HOME.lat, HOME.lng,
+            parkedAtMillis = Instant.parse("2026-11-02T22:10:00Z").toEpochMilli(), odoParkedKm = 110.0,
+            parkedLat = COMPANY.lat, parkedLng = COMPANY.lng,
+        )
+    }
+
+    @Test
+    fun `오래 서 있다가 다시 출발하면 이어 붙이지 않고 지난 운행을 먼저 기록한다`() = runBlocking {
+        val voice = FakeVoice("응")
+        val recorder = recorder(voice, parkedLongAgo())
+        vehicle.current = 110.0
+        recorder.start(scope)
+        vehicle.odometer.emit(110.0)
+        vehicle.gears.emit(Gear.DRIVE)
+
+        val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(90.0, saved.odoStartKm, 0.0)
+        assertEquals(110.0, saved.odoEndKm, 0.0)
+        assertEquals(Purpose.UNCONFIRMED, saved.purpose)
+        withTimeout(2_000) { recorder.status.first { it.phase == TripRecorder.Phase.DRIVING } }
+        assertTrue("다음 운행 중에는 지난 운행을 묻지 않는다", voice.spoken.none { it.contains("도착") })
+    }
+
+    @Test
+    fun `시동을 바로 끈 운행은 다음 시동 때 P에서 지난 운행으로 한 번 묻는다`() = runBlocking {
+        val voice = FakeVoice("응").apply { listenDelayMs = 300 }
+        val settings = parkedLongAgo()
+        vehicle.current = 110.0
+        vehicle.gears.emit(Gear.PARK)
+        val recorder = recorder(voice, settings)
+        recorder.start(scope)
+
+        val asking = withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.ASKING } }
+        assertTrue(asking.previousTrip)
+        assertEquals("지난 운행, 본사 도착, 20킬로미터. 출근으로 기록할까요?", asking.prompt)
+
+        val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { it.purpose != Purpose.UNCONFIRMED } } }.values.single()
+        assertEquals(Purpose.COMMUTE, saved.purpose)
+        assertEquals(PurposeSource.VOICE, saved.purposeSource)
+        assertEquals(saved.clientUuid, settings.reasked)
+    }
+
+    @Test
+    fun `지난 운행을 묻는 중에 출발하면 묻기를 멈추고 미확인으로 남긴다`() = runBlocking {
+        val voice = FakeVoice("응").apply { listenDelayMs = 3_000 }
+        vehicle.current = 110.0
+        vehicle.gears.emit(Gear.PARK)
+        val recorder = recorder(voice, parkedLongAgo())
+        recorder.start(scope)
+
+        withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.ASKING && it.previousTrip } }
+        vehicle.gears.emit(Gear.DRIVE)
+
+        withTimeout(2_000) { recorder.status.first { it.phase == TripRecorder.Phase.DRIVING } }
+        delay(500)
+        assertEquals(Purpose.UNCONFIRMED, trips.rows.value.values.single().purpose)
+    }
+
+    @Test
+    fun `운행 시작 버튼으로 시작하면 P를 무시하고 종료 버튼을 누를 때 묻는다`() = runBlocking {
+        val voice = FakeVoice("응")
+        val manual = ManualTripControl()
+        vehicle.gears.emit(Gear.PARK)
+        val recorder = recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)), manual = manual)
+        recorder.start(scope)
+        delay(200)
+
+        manual.start()
+        val driving = withTimeout(2_000) { recorder.status.first { it.phase == TripRecorder.Phase.DRIVING } }
+        assertTrue(driving.manual)
+        vehicle.odometer.emit(105.5)
+        location.points.emit(COMPANY)
+        vehicle.gears.emit(Gear.PARK)
+        delay(600)
+        assertEquals(TripRecorder.Phase.DRIVING, recorder.status.value.phase)
+
+        manual.stop()
+        val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(5.5, saved.distanceKm, 1e-9)
+        assertEquals(Purpose.COMMUTE, saved.purpose)
+        assertEquals(PurposeSource.VOICE, saved.purposeSource)
+    }
+
+    @Test
+    fun `수동 운행 중에는 마지막 계기판 거리와 위치를 주기적으로 저장한다`() = runBlocking {
+        val manual = ManualTripControl()
+        val settings = FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11))
+        recorder(FakeVoice("응"), settings, manual = manual, heartbeatMs = 100).start(scope)
+        delay(200)
+
+        manual.start()
+        withTimeout(2_000) { while (settings.ongoing?.manual != true) delay(20) }
+        vehicle.odometer.emit(104.0)
+        location.points.emit(COMPANY)
+
+        withTimeout(3_000) { while (settings.ongoing?.lastSeenOdoKm != 104.0) delay(20) }
+        assertEquals(COMPANY.lat, settings.ongoing?.lastSeenLat)
+    }
+
+    @Test
+    fun `수동 운행 중 시동이 꺼졌다 켜지면 마지막 확인 시점에서 끝내고 지난 운행으로 묻는다`() = runBlocking {
+        val settings = FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)).apply {
+            ongoing = OngoingTrip(
+                Instant.parse("2026-11-02T22:00:00Z").toEpochMilli(), 90.0, HOME.lat, HOME.lng, manual = true,
+                lastSeenAtMillis = Instant.parse("2026-11-02T22:10:00Z").toEpochMilli(), lastSeenOdoKm = 110.0,
+                lastSeenLat = COMPANY.lat, lastSeenLng = COMPANY.lng,
+            )
+        }
+        vehicle.current = 110.0
+        vehicle.gears.emit(Gear.PARK)
+        val recorder = recorder(FakeVoice("응").apply { listenDelayMs = 300 }, settings)
+        recorder.start(scope)
+
+        val asking = withTimeout(5_000) { recorder.status.first { it.phase == TripRecorder.Phase.ASKING } }
+        assertTrue(asking.previousTrip)
+        assertEquals("지난 운행, 본사 도착, 20킬로미터. 출근으로 기록할까요?", asking.prompt)
+        val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { it.purpose == Purpose.COMMUTE } } }.values.single()
+        assertEquals(Instant.parse("2026-11-02T22:10:00Z"), saved.endedAt)
+    }
+
+    private class FakeNotifications : ArrivalNotifications {
+        val events = java.util.concurrent.CopyOnWriteArrayList<String>()
+        override fun ask(tripUuid: String, prompt: String) {
+            events += "ask:$prompt"
+        }
+        override fun confirmed(tripUuid: String, message: String) {
+            events += "confirmed:$message"
+        }
+        override fun cancel(tripUuid: String) {
+            events += "cancel"
+        }
+    }
+
+    @Test
+    fun `도착 질문을 알림에도 남기고 정해지면 안내로 바꾼다`() = runBlocking {
+        val notifications = FakeNotifications()
+        recorder(FakeVoice("응"), FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)), notifications = notifications).start(scope)
+        delay(200)
+
+        drive(100.0, 112.4, COMPANY)
+
+        withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }
+        assertEquals(
+            listOf("ask:본사 도착, 12.4킬로미터. 출근으로 기록할까요?", "confirmed:출퇴근으로 기록했어요."),
+            notifications.events.toList(),
+        )
+    }
+
+    @Test
+    fun `대답이 없으면 알림을 남겨 두어 나중에 고를 수 있게 한다`() = runBlocking {
+        val notifications = FakeNotifications()
+        recorder(FakeVoice(null), FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)), notifications = notifications).start(scope)
+        delay(200)
+
+        drive(100.0, 105.0, GeoPoint(37.6, 127.2))
+
+        withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }
+        delay(200)
+        assertEquals(1, notifications.events.size)
+        assertTrue(notifications.events.single().startsWith("ask:"))
+    }
+
+    @Test
+    fun `등록 장소가 아닌 출발지와 도착지에는 내비 주소의 동 이름을 붙인다`() = runBlocking {
+        val names = ArrayDeque(listOf("봉천동", "신림동"))
+        val areas = object : com.autolog.app.location.AreaNameSource {
+            override suspend fun currentAreaName(): String? = names.removeFirstOrNull()
+        }
+        location.last = GeoPoint(37.48, 126.95)
+        val voice = FakeVoice("개인")
+        recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)), areaNames = areas).start(scope)
+        delay(200)
+
+        drive(100.0, 105.0, GeoPoint(37.6, 127.2))
+
+        val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals("봉천동", saved.originLabel)
+        assertEquals("신림동", saved.destLabel)
+        assertEquals("신림동 도착, 5킬로미터. 업무였나요, 개인 용도였나요?", voice.spoken.first())
+    }
+
+    @Test
+    fun `동 이름을 못 받으면 미등록 장소로 둔다`() = runBlocking {
+        val voice = FakeVoice("개인")
+        recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11))).start(scope)
+        delay(200)
+
+        drive(100.0, 105.0, GeoPoint(37.6, 127.2))
+
+        val saved = withTimeout(5_000) { trips.rows.first { rows -> rows.values.any { !it.answerPending } } }.values.single()
+        assertEquals(null, saved.destLabel)
+        assertEquals("미등록 장소 도착, 5킬로미터. 업무였나요, 개인 용도였나요?", voice.spoken.first())
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.autolog.app.AutologApp
 import com.autolog.app.BuildConfig
 import com.autolog.app.MainActivity
 import com.autolog.app.R
+import com.autolog.app.location.PleosAreaNameSource
 import com.autolog.app.location.PleosLocationSource
 import com.autolog.app.sync.SyncWorker
 import com.autolog.app.vehicle.PleosVehicleSource
@@ -34,6 +35,7 @@ class TripRecorderService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var vehicle: PleosVehicleSource? = null
     private var location: PleosLocationSource? = null
+    private var areaNames: PleosAreaNameSource? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -53,6 +55,9 @@ class TripRecorderService : Service() {
             requestSync = { SyncWorker.requestNow(this) },
             parkConfirm = Duration.ofSeconds(BuildConfig.PARK_CONFIRM_SECONDS.toLong()),
             taps = container.arrivalTaps,
+            manual = container.manualTrips,
+            notifications = container.arrivalNotifications,
+            areaNames = PleosAreaNameSource(this).also { areaNames = it },
         )
         recorder.start(scope)
         scope.launch {
@@ -70,6 +75,7 @@ class TripRecorderService : Service() {
         scope.cancel()
         // 음성은 앱 전체가 함께 쓰므로(AppContainer.voice) 여기서 해제하지 않는다.
         location?.release()
+        areaNames?.release()
         vehicle?.release()
         super.onDestroy()
     }

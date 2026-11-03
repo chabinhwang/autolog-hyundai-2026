@@ -37,6 +37,9 @@ class TripRepository(
 
     suspend fun places(): List<Place> = placeDao.active().map { it.toDomain() }
 
+    /** 가장 최근에 끝난 미확인 운행(질문 중이 아닌 것). 다음 시동 때 한 번 다시 묻는 데 쓴다. */
+    suspend fun latestUnconfirmed(): TripEntity? = tripDao.latestUnconfirmed()
+
     /**
      * 확정된 트립을 저장한다. 질문 전에 미확인(AUTO)으로 먼저 저장해, 질문 중 앱이 꺼져도 기록이 남는다.
      */
@@ -93,6 +96,14 @@ class TripRepository(
     }
 
     /** 도착 확인(음성 대답 또는 팝업 버튼) 결과 반영. 무응답·'나중에'면 미확인(AUTO) 그대로 업로드 대상이 된다. */
+    /**
+     * 도착 확인 결과를 저장하되 아직 업로드하지 않는다('다시 선택' 대기). 이 사이 앱이 꺼지면
+     * 다음 실행의 답변 대기 해제로 고른 용도 그대로 업로드된다.
+     */
+    suspend fun holdArrivalDecision(uuid: String, decision: PurposeDecision) {
+        tripDao.holdPurpose(uuid, decision.purpose, decision.source, decision.businessCategory)
+    }
+
     suspend fun applyArrivalDecision(uuid: String, decision: PurposeDecision) {
         tripDao.updatePurpose(uuid, decision.purpose, decision.source, decision.businessCategory)
     }
