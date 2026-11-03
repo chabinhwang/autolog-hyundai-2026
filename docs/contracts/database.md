@@ -1,10 +1,12 @@
 # 데이터베이스 (PostgreSQL)
 
-> [계약 문서 목차](README.md)
+> [기술 문서 목차](README.md)
+
+운행·차량·직원·장소·동의·수정 이력을 저장하는 구조입니다. [아키텍처](architecture.md)에서 흐름을 먼저 확인한 뒤 필요한 테이블을 참고하세요.
 
 - 마이그레이션은 Flyway(`server/src/main/resources/db/migration`)로만 합니다. JPA는 `ddl-auto: validate`.
 - 모든 테이블에 회사 범위(`org_id`)가 있거나 상위 테이블로 회사가 정해집니다.
-- `jsonb`는 H2가 지원하지 않으므로 서버 테스트 DB는 Testcontainers(PostgreSQL)로 전환합니다 (Docker 필요).
+- 서버 테스트도 PostgreSQL을 사용합니다. Testcontainers 또는 직접 준비한 테스트 DB의 지정 방법은 [개발·실행 안내](development.md#서버)에 있습니다.
 
 ## 열거값
 
@@ -104,7 +106,7 @@
 | `created_at` | timestamptz | not null | |
 | `paired_at` | timestamptz | null | |
 
-- 만료 판정은 조회 시점에 `expires_at`으로 합니다. `status`를 EXPIRED로 바꾸는 정리 작업은 선택 (제안).
+- 만료 판정은 조회 시점의 `expires_at`을 기준으로 합니다. 상태 정리 작업 유무와 관계없이 만료된 코드는 사용할 수 없습니다.
 
 ## trip (운행)
 
@@ -132,7 +134,7 @@
 | `updated_at` | timestamptz | not null | 마지막 수정 반영 시각 |
 | `app_version` | varchar(20) | null | |
 
-- Odometer는 Vehicle SDK `getCurrentDistanceDriven()`이 km 단위 `Float`로 줍니다 ([공식 문서](https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/vehicle/ai.pleos.playground.vehicle.api/odometer/get-current-distance-driven)). 소수 첫째 자리 반올림 저장 (제안).
+- Odometer는 Vehicle SDK가 km 단위 `Float`로 전달합니다. 서버에는 계기판 양끝을 소수 첫째 자리로 반올림해 저장하고 그 차이로 주행거리를 계산합니다.
 
 ## trip_edit_log (수정 이력)
 

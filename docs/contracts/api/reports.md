@@ -1,6 +1,8 @@
 # 대시보드·보고서 API
 
-> [계약 문서 목차](../README.md) · 규칙: [rules.md §8 집계](../rules.md#8-대시보드-집계-get-dashboardsummary), [§9 내보내기](../rules.md#9-기록부-내보내기-get-reportslogbook-d7)
+월간 주행거리·업무사용비율을 집계하고 차량별 운행기록부를 XLSX로 내려받는 API입니다. 개인 운행의 비공개 기준은 조회와 파일에 동일하게 적용합니다.
+
+> [기술 문서 목차](../README.md) · 규칙: [rules.md §8 집계](../rules.md#8-대시보드-집계-get-dashboardsummary), [§9 내보내기](../rules.md#9-기록부-내보내기-get-reportslogbook-d7)
 
 ## GET /api/v1/dashboard/summary — 월간 집계 (홈)
 

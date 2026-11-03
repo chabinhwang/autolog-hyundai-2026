@@ -1,6 +1,8 @@
 # 인증 API
 
-> [계약 문서 목차](../README.md) · 규칙: [rules.md §1](../rules.md#1-인증)
+> [기술 문서 목차](../README.md) · 규칙: [rules.md §1](../rules.md#1-인증)
+
+관리자 인증의 요청·응답 형식을 설명합니다. 꺾쇠 안의 값은 자리표시자이며 실제 로그인 정보는 대회 제출 문서에서 안내합니다.
 
 ## POST /api/v1/auth/login — 관리자 로그인
 
@@ -13,8 +15,8 @@
 
 ```json
 {
-  "loginId": "admin@autolog-demo.kr",
-  "password": "********"
+  "loginId": "<ADMIN_LOGIN_ID>",
+  "password": "<ADMIN_PASSWORD>"
 }
 ```
 
@@ -24,10 +26,10 @@
 {
   "success": true,
   "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+    "accessToken": "<ACCESS_TOKEN>",
     "tokenType": "Bearer",
     "expiresIn": 43200,
-    "admin": { "id": 1, "loginId": "admin@autolog-demo.kr", "displayName": "총무팀" },
+    "admin": { "id": 1, "loginId": "<ADMIN_LOGIN_ID>", "displayName": "총무팀" },
     "organization": { "id": 1, "name": "오토로그 주식회사" }
   },
   "error": null
@@ -77,7 +79,7 @@
 {
   "success": true,
   "data": {
-    "admin": { "id": 1, "loginId": "admin@autolog-demo.kr", "displayName": "총무팀" },
+    "admin": { "id": 1, "loginId": "<ADMIN_LOGIN_ID>", "displayName": "총무팀" },
     "organization": { "id": 1, "name": "오토로그 주식회사", "bizRegNo": "123-45-67890" },
     "expiresAt": "2026-11-03T20:00:00+09:00"
   },

@@ -1,6 +1,8 @@
 # 운행 API
 
-> [계약 문서 목차](../README.md) · 규칙: [rules.md §3 업로드](../rules.md#3-트립-업로드-put-tripsbatch), [§4 수정](../rules.md#4-수정-post-tripsclientuuidedits), [§7 마스킹](../rules.md#7-마스킹-관리자에게-보이는-값)
+차량의 운행 일괄 전송·수정과 관리자의 운행 조회를 제공합니다. 자동 기록은 보호하고, 관리자 응답에는 현재 용도에 따른 비공개 처리를 적용합니다.
+
+> [기술 문서 목차](../README.md) · 규칙: [rules.md §3 업로드](../rules.md#3-트립-업로드-put-tripsbatch), [§4 수정](../rules.md#4-수정-post-tripsclientuuidedits), [§7 마스킹](../rules.md#7-마스킹-관리자에게-보이는-값)
 
 ## PUT /api/v1/trips/batch — 트립 일괄 업로드
 

@@ -1,6 +1,8 @@
 # 페어링·기기 API
 
-> [계약 문서 목차](../README.md) · 규칙: [rules.md §2 페어링](../rules.md#2-페어링-d6), [§5 설정 내려받기](../rules.md#5-설정-내려받기-get-devicesmeconfig)
+차량 앱을 회사 차량과 연결하고, 직원·장소 설정과 개인정보 동의 기록을 동기화하는 API입니다.
+
+> [기술 문서 목차](../README.md) · 규칙: [rules.md §2 페어링](../rules.md#2-페어링-d6), [§5 설정 내려받기](../rules.md#5-설정-내려받기-get-devicesmeconfig)
 
 ## POST /api/v1/devices/pairing-codes — 페어링 코드 발급
 

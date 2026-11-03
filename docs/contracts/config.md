@@ -1,6 +1,6 @@
 # 서버 설정 (D12)
 
-> [계약 문서 목차](README.md) · 배포 연결: 루트 [README](../../README.md#oracle-배포-연결)
+> [기술 문서 목차](README.md) · [개발·실행 안내](development.md) · [배포 안내](../../deploy/README.md)
 
 서버 설정은 전부 환경변수로 받습니다. 비밀값은 저장소에 넣지 않고 운영 환경(배포 Actions secrets 또는 VM의 `.env`)에서만 관리합니다. 로컬 개발은 `application-local.yaml`의 개발용 값을 씁니다.
 
@@ -17,10 +17,10 @@
 | `CORS_ALLOWED_ORIGINS` | O | `https://autolog.aihub.io.kr,https://autolog-5wr.pages.dev,http://localhost:5173` | 쉼표 구분. 운영 대시보드 주소와 Pages 기본 도메인 (D8) |
 | `SEED_ORG_NAME` | | `오토로그 주식회사` | 시드 회사 상호명 |
 | `SEED_BIZ_REG_NO` | | `123-45-67890` | 시드 회사 사업자등록번호 |
-| `SEED_ADMIN_LOGIN_ID` | | `admin@autolog-demo.kr` | 시드 관리자 아이디 (이메일 형식) |
+| `SEED_ADMIN_LOGIN_ID` | | (별도 지정) | 시드 관리자 아이디 (이메일 형식) |
 | `SEED_ADMIN_PASSWORD` | | (비밀) | 시드 관리자 비밀번호. BCrypt로 저장 |
 | `SEED_ADMIN_DISPLAY_NAME` | | `총무팀` | 기본값 `관리자` |
-| `CONSENT_VERSION` | | `2026-11-01` | 기본 `2026-11-01`. 현재 동의 문서 버전 (D13). 차량 설정 내려받기 응답에 포함 (제안) |
+| `CONSENT_VERSION` | | `2026-11-01` | 기본 `2026-11-01`. 차량 설정에 전달하는 현재 동의 문서 버전 (D13) |
 
 - 필수 값이 없으면 서버가 시작하지 않습니다 (설정 오류를 배포 직후에 발견).
 - 로그에 비밀값·시드 비밀번호를 출력하지 않습니다.
