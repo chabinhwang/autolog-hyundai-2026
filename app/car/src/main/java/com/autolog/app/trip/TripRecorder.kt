@@ -88,6 +88,7 @@ class TripRecorder(
      * [suggested]는 추정 용도(미확인이면 null). 팝업에서 그 버튼을 '네, ○○'로 강조한다.
      * [sendAtMillis]는 CONFIRMING일 때 전송 예정 시각(epoch ms).
      * [manual]은 '운행 시작' 버튼으로 시작한 운행, [previousTrip]은 다음 시동 때 지난 운행을 묻는 중.
+     * [asksChoice]는 [lastMessage]가 미확인 운행을 화면에서 골라 달라는 안내라는 뜻(다 고르면 화면이 안내를 내린다).
      */
     data class Status(
         val phase: Phase,
@@ -99,6 +100,7 @@ class TripRecorder(
         val previousTrip: Boolean = false,
         /** 지금 묻고 있는 운행(알림 버튼이 이 운행이면 팝업 버튼과 같은 경로로 넘긴다). */
         val tripUuid: String? = null,
+        val asksChoice: Boolean = false,
     ) {
         val driving: Boolean get() = phase != Phase.IDLE
 
@@ -223,7 +225,7 @@ class TripRecorder(
             }
             is TripRepository.RecordResult.Saved -> if (late) {
                 repository.applyArrivalDecision(result.trip.clientUuid, PurposeDecision(Purpose.UNCONFIRMED, PurposeSource.AUTO, null))
-                _status.value = Status(Phase.IDLE, PREVIOUS_SAVED_MESSAGE)
+                _status.value = Status(Phase.IDLE, PREVIOUS_SAVED_MESSAGE, asksChoice = true)
                 requestSync()
                 launchReask()
             } else {
@@ -232,7 +234,7 @@ class TripRecorder(
                 val decision = confirmArrival(uuid, prompt, estimate, dest) { repository.holdArrivalDecision(uuid, it) }
                 repository.applyArrivalDecision(result.trip.clientUuid, decision)
                 val message = confirmation(decision)
-                _status.value = Status(Phase.IDLE, message)
+                _status.value = Status(Phase.IDLE, message, asksChoice = decision.purpose == Purpose.UNCONFIRMED)
                 // 정한 용도는 대기 중에 이미 읽어 줬다. 미확인일 때만 여기서 안내한다.
                 if (decision.purpose == Purpose.UNCONFIRMED) voice.speak(message)
                 requestSync()
@@ -325,7 +327,7 @@ class TripRecorder(
             requestSync()
         }
         val message = confirmation(decision)
-        _status.value = Status(Phase.IDLE, message)
+        _status.value = Status(Phase.IDLE, message, asksChoice = decision.purpose == Purpose.UNCONFIRMED)
         if (decision.purpose == Purpose.UNCONFIRMED) voice.speak(message)
     }
 

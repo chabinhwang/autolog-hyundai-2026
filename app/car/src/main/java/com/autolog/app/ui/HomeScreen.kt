@@ -95,11 +95,11 @@ private fun TwoPane(state: HomeState, actions: HomeActions) {
             Header(state, actions)
             if (state.unconfirmed.isEmpty()) {
                 // 할 일이 없으면 상태 카드를 키워 자동 기록 방식을 함께 보여준다.
-                StatusCard(state.status, actions, showGuide = true)
+                StatusCard(state.status, state.unconfirmed.size, actions, showGuide = true)
                 AllClearCard()
                 Spacer(Modifier.weight(1f))
             } else {
-                StatusCard(state.status, actions)
+                StatusCard(state.status, state.unconfirmed.size, actions)
                 UnconfirmedCard(state.unconfirmed, state.pendingChoices, actions, Modifier.weight(1f))
             }
             ActionRow(state.homeRegistered, actions)
@@ -132,7 +132,7 @@ private fun OnePane(state: HomeState, actions: HomeActions) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         item { Header(state, actions) }
-        item { StatusCard(state.status, actions) }
+        item { StatusCard(state.status, state.unconfirmed.size, actions) }
         if (state.unconfirmed.isEmpty()) {
             item { AllClearCard() }
         } else {
@@ -185,7 +185,13 @@ private fun Avatar(name: String) {
 private data class PhaseLook(val title: String, val hint: String, val step: Int)
 
 @Composable
-private fun StatusCard(status: TripRecorder.Status, actions: HomeActions, modifier: Modifier = Modifier, showGuide: Boolean = false) {
+private fun StatusCard(
+    status: TripRecorder.Status,
+    unconfirmedCount: Int,
+    actions: HomeActions,
+    modifier: Modifier = Modifier,
+    showGuide: Boolean = false,
+) {
     val colors = AutoLogColors
     val look = when (status.phase) {
         TripRecorder.Phase.IDLE -> PhaseLook("운행 대기 중", "기어를 D로 바꾸면 자동으로 기록해요.", 0)
@@ -214,8 +220,7 @@ private fun StatusCard(status: TripRecorder.Status, actions: HomeActions, modifi
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(look.title, style = PleosType.TitleLarge, color = colors.text)
                 Text(
-                    // 대기 중이면 마지막 결과(확정 안내·기록 안 함 사유)를, 진행 중이면 지금 할 일을 보여준다.
-                    if (status.phase == TripRecorder.Phase.IDLE) status.lastMessage ?: look.hint else look.hint,
+                    statusHint(status, unconfirmedCount, look.hint),
                     style = PleosType.BodyMedium,
                     color = colors.textTertiary,
                     maxLines = 2,
@@ -515,4 +520,14 @@ private fun syncLabel(trip: TripEntity) = when (trip.syncState) {
     SyncState.SYNCED -> "전송됨"
     SyncState.PENDING -> if (trip.answerPending) "확인 중" else "전송 대기"
     SyncState.FAILED -> "전송 실패(${trip.syncErrorCode}) · 관리자 문의"
+}
+
+/**
+ * 상태 카드 둘째 줄. 대기 중이면 마지막 결과(확정 안내·기록 안 함 사유)를, 진행 중이면 지금 할 일을 보여준다.
+ * '화면에서 골라 주세요' 안내는 미확인 운행을 다 고르면 내리고 기본 안내로 돌아간다.
+ */
+internal fun statusHint(status: TripRecorder.Status, unconfirmedCount: Int, defaultHint: String): String {
+    if (status.phase != TripRecorder.Phase.IDLE) return defaultHint
+    if (status.asksChoice && unconfirmedCount == 0) return defaultHint
+    return status.lastMessage ?: defaultHint
 }

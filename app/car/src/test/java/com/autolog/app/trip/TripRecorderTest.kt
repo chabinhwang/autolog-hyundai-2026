@@ -209,7 +209,8 @@ class TripRecorderTest {
     @Test
     fun `대답이 없으면 미확인으로 남긴다`() = runBlocking {
         val voice = FakeVoice(null)
-        recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11))).start(scope)
+        val recorder = recorder(voice, FakeSettings(PairedVehicleInfo(3, "12가3456", null, 11)))
+        recorder.start(scope)
         delay(200)
 
         drive(100.0, 105.0, GeoPoint(37.6, 127.2))
@@ -220,6 +221,8 @@ class TripRecorderTest {
         assertEquals(EndpointType.UNREGISTERED, saved.destType)
         withTimeout(2_000) { while (voice.spoken.size < 2) delay(20) }
         assertEquals("미확인으로 남겨 둘게요. 정차 중에 화면에서 골라 주세요.", voice.spoken[1])
+        // 화면에서 골라 달라는 안내라고 표시해 둔다(다 고르면 상태 카드가 안내를 내린다).
+        assertTrue(withTimeout(2_000) { recorder.status.first { it.phase == TripRecorder.Phase.IDLE && it.lastMessage != null } }.asksChoice)
         assertEquals(1, voice.listens)
     }
 
