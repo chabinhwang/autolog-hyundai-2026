@@ -39,8 +39,11 @@ export function DistanceBar({ parts, showLegend = false }: { parts: DistancePart
         <ul className="distance__legend">
           {SEGMENTS.map((segment) => (
             <li key={segment.key}>
-              <span className={`dot dot--${segment.className}`} aria-hidden="true" />
-              {segment.label} <span className="strong">{formatKm(parts[segment.key])}</span> km
+              <span className="distance__name">
+                <span className={`dot dot--${segment.className}`} aria-hidden="true" />
+                {segment.label}
+              </span>
+              <span className="distance__value">{formatKm(parts[segment.key])} km</span>
             </li>
           ))}
         </ul>

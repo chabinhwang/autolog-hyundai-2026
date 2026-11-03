@@ -177,33 +177,39 @@ function ratioOf(part: number, total: number): number | null {
   return total > 0 ? Math.round((part / total) * 1000) / 10 : null
 }
 
-/** 홈 상단 요약 카드: 총주행, 업무사용비율, 미확인, 경고 차량 */
+/** 그 달 전체 차량의 운행 목록 링크 (용도 필터 선택) */
+function monthTripsLink(month: string, purpose?: string): string {
+  const { from, to } = monthRange(month)
+  const params = new URLSearchParams({ from, to })
+  if (purpose) params.set('purpose', purpose)
+  return `/trips?${params.toString()}`
+}
+
+/** 홈 상단 요약 카드: 업무사용비율, 총주행거리, 미확인 운행, 경고 차량 */
 function SummaryCards({ summary }: { summary: DashboardSummary }) {
   const { totals } = summary
-  const ratio = totals.businessRatio
   const maxRatio = ratioOf(totals.commuteKm + totals.businessKm + totals.unconfirmedKm, totals.totalKm)
-  const warned = summary.vehicles.filter((vehicle) => vehicle.warnings.length > 0).length
+  const warnedVehicles = summary.vehicles.filter((vehicle) => vehicle.warnings.length > 0)
   const trips = summary.vehicles.reduce((sum, vehicle) => sum + vehicle.tripCount, 0)
+  const hasUnconfirmed = totals.unconfirmedCount > 0
   return (
     <div className="kpis" aria-label="이번 달 요약">
-      <div className="kpi kpi--primary">
+      <div className="kpi">
         <div className="kpi__label">
-          <span className="kpi__icon">
-            <Icon name="gauge" size={18} />
+          <span className="kpi__icon kpi__icon--brand">
+            <Icon name="gauge" size={22} />
           </span>
           업무사용비율
         </div>
-        <div className="kpi__value">{formatRatio(ratio)}</div>
-        <div className="meter" aria-hidden="true">
-          <span className="meter__fill" style={{ width: `${Math.min(ratio ?? 0, 100)}%` }} />
-          {maxRatio !== null && <span className="meter__max" style={{ left: `${Math.min(maxRatio, 100)}%` }} />}
-        </div>
-        <div className="kpi__sub">미확인이 모두 업무라면 최대 {formatRatio(maxRatio)}</div>
+        <div className="kpi__value">{formatRatio(totals.businessRatio)}</div>
+        <p className="kpi__sub">
+          미확인이 모두 업무라면 최대 <strong className="kpi__em">{formatRatio(maxRatio)}</strong>
+        </p>
       </div>
-      <div className="kpi kpi--wide">
+      <div className="kpi">
         <div className="kpi__label">
-          <span className="kpi__icon">
-            <Icon name="route" size={18} />
+          <span className="kpi__icon kpi__icon--brand">
+            <Icon name="route" size={22} />
           </span>
           총주행거리
         </div>
@@ -213,10 +219,10 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
         </div>
         <DistanceBar parts={totals} showLegend />
       </div>
-      <div className={totals.unconfirmedCount > 0 ? 'kpi kpi--attention' : 'kpi'}>
+      <div className="kpi">
         <div className="kpi__label">
-          <span className="kpi__icon">
-            <Icon name="question" size={18} />
+          <span className={hasUnconfirmed ? 'kpi__icon kpi__icon--warn' : 'kpi__icon'}>
+            <Icon name="question" size={22} />
           </span>
           미확인 운행
         </div>
@@ -224,22 +230,39 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
           {totals.unconfirmedCount}
           <span className="kpi__unit">건</span>
         </div>
-        <div className="kpi__sub">
-          전체 {trips}건 중 · {formatKm(totals.unconfirmedKm)} km
-        </div>
+        <p className="kpi__sub">
+          전체 {trips}건 중 {totals.unconfirmedCount}건 · {formatKm(totals.unconfirmedKm)} km
+        </p>
+        {hasUnconfirmed && (
+          <Link to={monthTripsLink(summary.month, 'UNCONFIRMED')} className="kpi__link">
+            미확인 운행 보기
+            <Icon name="chevronRight" size={16} />
+          </Link>
+        )}
       </div>
-      <div className={warned > 0 ? 'kpi kpi--attention' : 'kpi'}>
+      <div className="kpi">
         <div className="kpi__label">
-          <span className="kpi__icon">
-            <Icon name="alert" size={18} />
+          <span className={warnedVehicles.length > 0 ? 'kpi__icon kpi__icon--warn' : 'kpi__icon'}>
+            <Icon name="alert" size={22} />
           </span>
           경고 차량
         </div>
         <div className="kpi__value">
-          {warned}
+          {warnedVehicles.length}
           <span className="kpi__unit">/ {summary.vehicles.length}대</span>
         </div>
-        <div className="kpi__sub">{warned > 0 ? '표의 경고 항목을 확인해 주세요' : '확인할 경고가 없습니다'}</div>
+        {warnedVehicles.length > 0 ? (
+          <ul className="kpi__list">
+            {warnedVehicles.map((vehicle) => (
+              <li key={vehicle.vehicleId}>
+                <span className="kpi__em">{vehicle.regNo}</span>{' '}
+                {vehicle.warnings.map((code) => WARNING_LABEL[code]?.label ?? code).join(', ')}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="kpi__sub">확인할 경고가 없습니다</p>
+        )}
       </div>
     </div>
   )
