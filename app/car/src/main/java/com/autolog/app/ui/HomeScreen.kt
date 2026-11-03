@@ -378,8 +378,7 @@ private fun SummaryCard(month: YearMonth, summary: MonthSummary) {
         }
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Stat("운행", "${summary.tripCount}건", Modifier.weight(1f))
-            Stat("주행 거리", String.format(Locale.ROOT, "%.1fkm", summary.totalKm), Modifier.weight(1f))
+            Stat("주행 거리", Distance.km(summary.totalKm), Modifier.weight(2f))
             Stat("업무사용비율", summary.businessRatio?.let { "$it%" } ?: "–", Modifier.weight(1f), highlight = (summary.businessRatio ?: 0) > 0)
         }
     }
