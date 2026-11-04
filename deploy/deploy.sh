@@ -21,7 +21,7 @@ done
 docker compose version >/dev/null
 compose_help=$(docker compose up --help)
 [[ "$compose_help" == *'--wait-timeout'* ]] || fail 'Docker Compose의 --wait/--wait-timeout 지원 버전이 필요합니다.'
-docker network inspect shared-proxy >/dev/null 2>&1 || fail 'shared-proxy가 없습니다. 공통 Nginx를 관리하는 shared-infrastructure 설정을 확인하세요.'
+docker network inspect shared-proxy >/dev/null 2>&1 || fail 'shared-proxy가 없습니다. 공통 Nginx의 공용 프록시 네트워크 설정을 확인하세요.'
 
 # GitHub concurrency는 리포별입니다. 여기서는 수동 실행까지 포함해 AutoLog 배포를 서버에서 직렬화합니다.
 exec 9>"$DEPLOY_DIR/.deploy.lock"

@@ -92,7 +92,7 @@ networks:
   # API와 DB 전용. API의 외부 통신은 shared_proxy 연결을 이용합니다.
   default:
     internal: true
-  # shared-infrastructure에서 이미 생성·관리하는 공용 프록시 네트워크입니다.
+  # 공통 Nginx와 연결하기 위해 별도로 생성·관리하는 공용 프록시 네트워크입니다.
   # 이 Compose가 생성하거나 삭제하지 않습니다.
   shared_proxy:
     external: true
