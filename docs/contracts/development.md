@@ -70,6 +70,16 @@ cd app
 
 운영 테스트 앱은 'AutoLog 서버 테스트'(`com.autolog.app.remote`)로 별도 설치됩니다. APK는 `app/car/build/outputs/apk/{빌드유형}/`에 생성됩니다. 빌드별 주소·주차 대기 시간은 [차량 앱](car-app.md#5-빌드csv)을 참고하세요.
 
+### 제출용 release 서명
+
+제출 APK는 [apk/우사기_AutoLog_release.apk](../../apk/우사기_AutoLog_release.apk)입니다. 새로 빌드하려면 `app/release-signing.properties.example`을 `app/release-signing.properties`로 복사하고 개인 서명키 경로·암호·별칭을 입력합니다. `storeFile`의 상대 경로는 `app/` 기준입니다. 서명키·실제 설정 파일은 Git에 포함하지 않습니다.
+
+```sh
+./gradlew :car:assembleRelease :car:lintRelease
+```
+
+서명 설정이 있으면 `app/car/build/outputs/apk/release/car-release.apk`가 생성됩니다. 설정이 없으면 서명되지 않은 APK가 생성되므로 설치·제출용으로 사용할 수 없습니다. release는 운영 API·P 유지 180초를 사용하며 디버그 PCM 주입을 사용하지 않습니다. 같은 `com.autolog.app`의 debug 앱과 서명이 다르므로, 기존 데이터를 보존하려면 별도 AVD에서 설치합니다.
+
 ### Pleos 에뮬레이터
 
 [공식 설치 안내](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator)에 따라 AVD를 준비합니다. 검증 환경은 Pleos Connect Emulator 2.1.0·Android 14/API 34·arm64이며 Cold boot·RAM 4GB를 사용했습니다.
