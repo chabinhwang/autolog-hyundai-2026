@@ -1,0 +1,15 @@
+# Reviewed synthetic values only; these fingerprints identify exact findings.
+# Incomplete mock JWTs in the dashboard fixtures and their original API example.
+362c0ff4acc3c294a0a7bed44e1df0b336d76bed:dashboard/src/test/fixtures/auth-login-success.json:generic-api-key:4
+362c0ff4acc3c294a0a7bed44e1df0b336d76bed:dashboard/src/test/renderApp.tsx:generic-api-key:6
+e1c8bc75cc8eb9e8e73acc76a90dca3c8fcdd205:docs/contracts/api/auth.md:generic-api-key:27
+dashboard/src/test/fixtures/auth-login-success.json:generic-api-key:4
+dashboard/src/test/renderApp.tsx:generic-api-key:6
+
+# The documented SHA-256 digest is an example hash, not a device token or key.
+e1c8bc75cc8eb9e8e73acc76a90dca3c8fcdd205:docs/contracts/api/devices.md:generic-api-key:18
+docs/contracts/api/devices.md:generic-api-key:20
+
+# A deterministic 32-character value used only by configuration unit tests.
+19fda8976e647e680a4f2c035a96025cedd8f0ab:server/src/test/java/com/autolog/server/global/config/AppPropertiesTest.java:generic-api-key:13
+server/src/test/java/com/autolog/server/global/config/AppPropertiesTest.java:generic-api-key:13

@@ -11,6 +11,10 @@
 .cxx/
 *.keystore
 *.jks
+*.p12
+*.pfx
+*.pem
+*.key
 # secrets
 .env
 .env.*
