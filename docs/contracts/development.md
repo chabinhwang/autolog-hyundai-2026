@@ -101,3 +101,13 @@ curl -X PUT 'http://127.0.0.1:8088/vehicle/gear?gear=Park'
 ## 아이콘
 
 차량 앱의 adaptive icon, [스토어용 512px PNG](../../apk/app-icon-512.png), 대시보드의 `LogoMark`·`favicon.svg`는 남색 `#002C5F`와 같은 계기판 바늘 도안을 사용합니다. 런처·스토어의 시스템 마스크에 따라 외곽 모양은 달라질 수 있습니다.
+
+## 저장소 공개 전 확인
+
+Gitleaks 8.30.1 기준으로 전체 Git 이력을 검사할 수 있습니다.
+
+```sh
+gitleaks git . --log-opts=--all --redact=100
+```
+
+[.gitleaksignore](../../.gitleaksignore)는 직접 확인한 테스트 토큰·문서 예시의 정확한 탐지 위치만 제외합니다. 운영 키·환경파일·서명키·개인 제출 문서는 `.local/` 등 Git 제외 경로에서 관리합니다. 저장소를 공개하면 이전 커밋의 작성자·이메일도 표시되므로, 파일 검사와 별도로 작성자 정보의 공개 범위를 확인합니다.
