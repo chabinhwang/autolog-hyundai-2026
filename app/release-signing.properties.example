@@ -1,0 +1,6 @@
+# Copy to release-signing.properties and use your own private signing key.
+# storeFile is relative to app/ unless an absolute path is supplied.
+storeFile=../.local/signing/autolog-release.jks
+storePassword=<KEYSTORE_PASSWORD>
+keyAlias=autolog-release
+keyPassword=<KEY_PASSWORD>

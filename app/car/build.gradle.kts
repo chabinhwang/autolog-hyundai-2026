@@ -1,9 +1,17 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
+}
+
+// 서명키와 암호는 Git에 포함하지 않는 로컬 파일에서만 읽는다.
+val releaseSigningFile = rootProject.file("release-signing.properties")
+val releaseSigning = Properties().apply {
+    if (releaseSigningFile.isFile) releaseSigningFile.inputStream().use { load(it) }
 }
 
 android {
@@ -25,6 +33,17 @@ android {
         buildConfigField("int", "PARK_CONFIRM_SECONDS", "180")
     }
 
+    signingConfigs {
+        if (releaseSigningFile.isFile) {
+            create("release") {
+                storeFile = rootProject.file(releaseSigning.getProperty("storeFile"))
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias")
+                keyPassword = releaseSigning.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // 에뮬레이터 → 호스트 로컬 서버. 시연·검증 시간을 줄이려고 종료 확정을 30초로 줄인다.
@@ -40,6 +59,7 @@ android {
             buildConfigField("String", "API_BASE_URL", "\"https://autolog-api.aihub.io.kr\"")
         }
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
