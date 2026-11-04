@@ -1,6 +1,6 @@
 # AutoLog 설치 파일
 
-- 제출 파일: [우사기_AutoLog_release.apk](우사기_AutoLog_release.apk)
+- 제출 파일: [AutoLog_release.apk](AutoLog_release.apk)
 - 앱 이름·버전: AutoLog 0.1.0 (`versionCode=1`)
 - 패키지: `com.autolog.app` · 전용 키로 서명한 release · 디버그 모드 비활성
 - 환경: Pleos Connect 전용 에뮬레이터 또는 호환 차량, Android API 28 이상
@@ -9,7 +9,7 @@
 저장소 루트에서 다음 명령으로 설치합니다.
 
 ```sh
-adb install "apk/우사기_AutoLog_release.apk"
+adb install "apk/AutoLog_release.apk"
 ```
 
 앱에 표시된 6자리 코드를 관리자 대시보드의 차량 페어링에 입력합니다. 체험 계정과 상세 순서는 대회 제출 DOCX에서 안내합니다. [시연 영상](https://youtu.be/Z5fA_ZXDCBs) · [개발·서명 안내](../docs/contracts/development.md)

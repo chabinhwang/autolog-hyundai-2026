@@ -72,7 +72,7 @@ cd app
 
 ### 제출용 release 서명
 
-제출 APK는 [apk/우사기_AutoLog_release.apk](../../apk/우사기_AutoLog_release.apk)입니다. 새로 빌드하려면 `app/release-signing.properties.example`을 `app/release-signing.properties`로 복사하고 개인 서명키 경로·암호·별칭을 입력합니다. `storeFile`의 상대 경로는 `app/` 기준입니다. 서명키·실제 설정 파일은 Git에 포함하지 않습니다.
+제출 APK는 [apk/AutoLog_release.apk](../../apk/AutoLog_release.apk)입니다. 새로 빌드하려면 `app/release-signing.properties.example`을 `app/release-signing.properties`로 복사하고 개인 서명키 경로·암호·별칭을 입력합니다. `storeFile`의 상대 경로는 `app/` 기준입니다. 서명키·실제 설정 파일은 Git에 포함하지 않습니다.
 
 ```sh
 ./gradlew :car:assembleRelease :car:lintRelease

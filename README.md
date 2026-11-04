@@ -37,10 +37,10 @@ AutoLog는 Pleos Connect 차량의 계기판 주행거리와 시각을 자동으
 
 **[관리자 대시보드 열기](https://autolog.aihub.io.kr)** · **[시연 영상 보기](https://youtu.be/Z5fA_ZXDCBs)**
 
-제출용 차량 앱은 **[우사기_AutoLog_release.apk](apk/우사기_AutoLog_release.apk)**(v0.1.0)입니다. Pleos Connect 전용 에뮬레이터·호환 차량에서 설치하고, 대시보드의 차량 관리에서 앱의 6자리 코드로 연결합니다. 주차 후 3분이 지나면 운행 용도를 확인합니다. 체험 로그인 정보는 대회 제출 문서에서 안내합니다.
+제출용 차량 앱은 **[AutoLog_release.apk](apk/AutoLog_release.apk)**(v0.1.0)입니다. Pleos Connect 전용 에뮬레이터·호환 차량에서 설치하고, 대시보드의 차량 관리에서 앱의 6자리 코드로 연결합니다. 주차 후 3분이 지나면 운행 용도를 확인합니다. 체험 로그인 정보는 대회 제출 문서에서 안내합니다.
 
 ```sh
-adb install "apk/우사기_AutoLog_release.apk"
+adb install "apk/AutoLog_release.apk"
 ```
 
 Pleos Connect Emulator와 배포 서버를 연결해 신규 차량 등록부터 기록 전송까지 검증했습니다. 운행 **5건·34.5km**의 앱·서버 식별자와 거리가 일치했고, 용도 수정 동기화·개인 운행 비공개 처리·CSV/XLSX 저장도 확인했습니다. 서명된 release에서도 신규 연결·P 유지 180초·1km 운행 전송을 추가 확인했습니다.
